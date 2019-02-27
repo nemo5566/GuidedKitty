@@ -54,33 +54,33 @@ class DetField(BaseField):
         return start_idx, end_idx
 
     def _get_strategy_idx(self):
-        if self._current_index in range(0, self._bitflip_1_1_num_mutations):
-            self._strategy_idx = 0
+        if self._current_index == self._bitflip_1_1_num_mutations - 1:
+            self._strategy_idx += 1
             self._base_number += self._bitflip_1_1_num_mutations
-        elif self._current_index in range(self._base_number, self._base_number + self._bitflip_2_1_num_mutations):
+        elif self._current_index == self._base_number + self._bitflip_2_1_num_mutations -1:
             self._strategy_idx += 1
             self._base_number += self._bitflip_2_1_num_mutations
-        elif self._current_index in range(self._base_number, self._base_number + self._bitflip_4_1_num_mutations):
+        elif self._current_index == self._base_number + self._bitflip_4_1_num_mutations -1:
             self._strategy_idx += 1
             self._base_number += self._bitflip_4_1_num_mutations
-        elif self._current_index in range(self._base_number, self._base_number + self._bitflip_8_8_num_mutations):
+        elif self._current_index == self._base_number + self._bitflip_8_8_num_mutations -1:
             self._strategy_idx += 1
             self._base_number += self._bitflip_8_8_num_mutations
-        elif self._current_index in range(self._base_number, self._base_number + self._bitflip_16_8_num_mutations):
+        elif self._current_index == self._base_number + self._bitflip_16_8_num_mutations -1:
             self._strategy_idx += 1
             self._base_number += self._bitflip_16_8_num_mutations
-        elif self._current_index in range(self._base_number, self._base_number + self._bitflip_32_8_num_mutations):
+        elif self._current_index == self._base_number + self._bitflip_32_8_num_mutations -1:
             self._strategy_idx += 1
             self._base_number += self._bitflip_32_8_num_mutations
-        elif self._current_index in range(self._base_number, self._base_number + self._arith_8_8_num_mutations):
+        elif self._current_index == self._base_number + self._arith_8_8_num_mutations -1:
             self._strategy_idx += 1
             self._base_number += self._arith_8_8_num_mutations
-        elif self._current_index in range(self._base_number, self._base_number + self._arith_16_8_num_mutations):
+        elif self._current_index == self._base_number + self._arith_16_8_num_mutations -1:
             self._strategy_idx += 1
             self._base_number += self._arith_16_8_num_mutations
-        elif self._current_index in range(self._base_number, self._base_number + self._arith_32_8_num_mutations):
-            self._strategy_idx += 1
-            self._base_number += self._arith_32_8_num_mutations
+        # elif self._current_index == self._base_number + self._arith_32_8_num_mutations -1:
+        #     self._strategy_idx += 1
+        #     self._base_number += self._arith_32_8_num_mutations
         return
 
     def _mutate(self):
