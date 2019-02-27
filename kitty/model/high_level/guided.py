@@ -1,6 +1,5 @@
 '''
 
-
 '''
 from kitty.model.high_level.base import BaseModel
 from kitty.model.high_level.base import Connection
@@ -11,6 +10,7 @@ class GuidedModel(BaseModel):
     '''
 
     '''
+
     def __init__(self, name = "GuidedModel"):
         '''
 
