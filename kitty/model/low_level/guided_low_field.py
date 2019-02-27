@@ -84,10 +84,10 @@ class DetField(BaseField):
         return
 
     def _mutate(self):
-        self._get_strategy_idx()
         method_name = "_" + self._strategy[self._strategy_idx]
         method = getattr(self, method_name)
         method()
+        self._get_strategy_idx()
 
     def get_info(self):
         info = super(DetField, self).get_info()
