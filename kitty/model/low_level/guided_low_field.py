@@ -173,6 +173,7 @@ class DetField(BaseField):
             tmp_val -= self._arith_tmp
         tmp_bit = Bits(int=tmp_val, length=self._num_bits)
         new_val.overwrite(tmp_bit, start)
+        self.set_current_value(Bits(new_val))
 
     def _arith_16_8(self):
         self._num_bits = 16
@@ -200,6 +201,7 @@ class DetField(BaseField):
             tmp_val -= self._arith_tmp
         tmp_bit = Bits(int=tmp_val, length=self._num_bits)
         new_val.overwrite(tmp_bit, start)
+        self.set_current_value(Bits(new_val))
 
     def _arith_32_8(self):
         self._num_bits = 32
@@ -227,3 +229,4 @@ class DetField(BaseField):
             tmp_val -= self._arith_tmp
         tmp_bit = Bits(int=tmp_val, length=self._num_bits)
         new_val.overwrite(tmp_bit, start)
+        self.set_current_value(Bits(new_val))
