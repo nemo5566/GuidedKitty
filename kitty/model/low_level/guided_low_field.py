@@ -53,7 +53,6 @@ class DetField(BaseField):
         self._current_offset = 0
         self._arith_tmp = 1
 
-    @property
     def _start_end(self):
         self._current_offset = self._current_index - self._base_number
         if self._strategy_idx < 4:
@@ -71,28 +70,28 @@ class DetField(BaseField):
 
     def _get_strategy_idx(self):
         if self._current_index == self._bitflip_1_1_num_mutations - 1:
-            self._strategy_idx += 1
+            self._strategy_idx = 1
             self._base_number += self._bitflip_1_1_num_mutations
-        elif self._current_index == self._base_number + self._bitflip_2_1_num_mutations - 1:
-            self._strategy_idx += 1
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations - 1:
+            self._strategy_idx = 2
             self._base_number += self._bitflip_2_1_num_mutations
-        elif self._current_index == self._base_number + self._bitflip_4_1_num_mutations - 1:
-            self._strategy_idx += 1
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + self._bitflip_4_1_num_mutations - 1:
+            self._strategy_idx = 3
             self._base_number += self._bitflip_4_1_num_mutations
-        elif self._current_index == self._base_number + self._bitflip_8_8_num_mutations - 1:
-            self._strategy_idx += 1
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations - 1:
+            self._strategy_idx = 4
             self._base_number += self._bitflip_8_8_num_mutations
-        elif self._current_index == self._base_number + self._bitflip_16_8_num_mutations - 1:
-            self._strategy_idx += 1
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations + self._bitflip_16_8_num_mutations - 1:
+            self._strategy_idx = 5
             self._base_number += self._bitflip_16_8_num_mutations
-        elif self._current_index == self._base_number + self._bitflip_32_8_num_mutations - 1:
-            self._strategy_idx += 1
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations + self._bitflip_16_8_num_mutations + self._bitflip_32_8_num_mutations - 1:
+            self._strategy_idx = 6
             self._base_number += self._bitflip_32_8_num_mutations
-        elif self._current_index == self._base_number + self._arith_8_8_num_mutations - 1:
-            self._strategy_idx += 1
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations + self._bitflip_16_8_num_mutations + self._bitflip_32_8_num_mutations + self._arith_8_8_num_mutations - 1:
+            self._strategy_idx = 7
             self._base_number += self._arith_8_8_num_mutations
-        elif self._current_index == self._base_number + self._arith_16_8_num_mutations - 1:
-            self._strategy_idx += 1
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations + self._bitflip_16_8_num_mutations + self._bitflip_32_8_num_mutations + self._arith_8_8_num_mutations + self._arith_16_8_num_mutations - 1:
+            self._strategy_idx = 8
             self._base_number += self._arith_16_8_num_mutations
         # elif self._current_index == self._base_number + self._arith_32_8_num_mutations -1:
         #     self._strategy_idx += 1
@@ -100,6 +99,7 @@ class DetField(BaseField):
         return
 
     def _mutate(self):
+        print self._strategy_idx, self._current_offset, self._current_index
         method_name = "_" + self._strategy[self._strategy_idx]
         method = getattr(self, method_name)
         method()
@@ -180,25 +180,25 @@ class DetField(BaseField):
         self._arith_tmp = self._current_offset//(self._data_len_bytes-1) + 1
         start, end = self._start_end()
         new_val = BitArray(self._default_value).copy()
+        tmp_val = new_val[start: end]
         if self._arith_tmp in range(0, self._arith_max):
-            tmp_val = new_val[start: end].uint
+            tmp_val = tmp_val.uint
             tmp_val += self._arith_tmp
         elif self._arith_tmp in range(self._arith_max, self._arith_max*2):
-            tmp_val = new_val[start: end].uint
+            tmp_val = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
             tmp_val -= self._arith_tmp
         elif self._arith_tmp in range(self._arith_max*2, self._arith_max*3):
-            tmp_val = new_val[start: end]
             tmp_val.byteswap(2)
             tmp_val = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
             tmp_val += self._arith_tmp
         elif self._arith_tmp in range(self._arith_max*3, self._arith_max*4):
-            tmp_val = new_val[start: end]
             tmp_val.byteswap(2)
             tmp_val = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
             tmp_val -= self._arith_tmp
+        print tmp_val
         tmp_bit = Bits(int=tmp_val, length=self._num_bits)
         new_val.overwrite(tmp_bit, start)
         self.set_current_value(Bits(new_val))
@@ -208,21 +208,20 @@ class DetField(BaseField):
         self._arith_tmp = self._current_offset//(self._data_len_bytes-1) + 1
         start, end = self._start_end()
         new_val = BitArray(self._default_value).copy()
+        tmp_val = new_val[start: end]
         if self._arith_tmp in range(0, self._arith_max):
-            tmp_val = new_val[start: end].uint
+            tmp_val = tmp_val.uint
             tmp_val += self._arith_tmp
         elif self._arith_tmp in range(self._arith_max, self._arith_max*2):
-            tmp_val = new_val[start: end].uint
+            tmp_val = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
             tmp_val -= self._arith_tmp
         elif self._arith_tmp in range(self._arith_max*2, self._arith_max*3):
-            tmp_val = new_val[start: end]
             tmp_val.byteswap(4)
             tmp_val = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
             tmp_val += self._arith_tmp
         elif self._arith_tmp in range(self._arith_max*3, self._arith_max*4):
-            tmp_val = new_val[start: end]
             tmp_val.byteswap(4)
             tmp_val = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
