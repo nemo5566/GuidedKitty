@@ -28,3 +28,7 @@ class DetFieldTests(BaseTestCase):
     def testDetFieldOn32bits(self):
         expected_mutations = map(lambda i: strToBytes(chr(1 << i)), range(8))
         self._testBase(b'\x00\x00\x00\x00', expected_mutations)
+
+    def testDetFieldOnBinaryFile(self):
+        bf = open("./README.rst", "rb").read()
+        self._testBase(bf, [])
