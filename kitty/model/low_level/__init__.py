@@ -27,3 +27,4 @@ from kitty.model.low_level.container_mutator import *
 from kitty.model.low_level.encoder import *
 from kitty.model.low_level.field import *
 from kitty.model.low_level.mutated_field import *
+from kitty.model.low_level.guided_low_field import *
