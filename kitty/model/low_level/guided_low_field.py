@@ -162,11 +162,11 @@ class DetField(BaseField):
 
     def _arith_8_8(self):
         self._num_bits = 8
-        self._arith_tmp = self._current_offset//self._data_len_bytes + 1
         start, end = self._start_end()
         new_val = BitArray(self._default_value).copy()
         tmp_val = new_val[start: end].uint
-        if self._arith_tmp < self._arith_max:
+        self._arith_tmp = self._current_offset//self._data_len_bytes + 1
+        if self._arith_tmp <= self._arith_max:
             tmp_val += self._arith_tmp
         else:
             self._arith_tmp = self._arith_tmp % self._arith_max
@@ -177,55 +177,60 @@ class DetField(BaseField):
 
     def _arith_16_8(self):
         self._num_bits = 16
-        self._arith_tmp = self._current_offset//(self._data_len_bytes-1) + 1
         start, end = self._start_end()
         new_val = BitArray(self._default_value).copy()
         tmp_val = new_val[start: end]
+        self._arith_tmp = self._current_offset//(self._data_len_bytes-1)
         if self._arith_tmp in range(0, self._arith_max):
-            tmp_val = tmp_val.uint
-            tmp_val += self._arith_tmp
-        elif self._arith_tmp in range(self._arith_max, self._arith_max*2):
-            tmp_val = tmp_val.uint
+            tmp_v = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
-            tmp_val -= self._arith_tmp
+            tmp_v += (self._arith_tmp+1)
+        elif self._arith_tmp in range(self._arith_max, self._arith_max*2):
+            tmp_v = tmp_val.uint
+            self._arith_tmp = self._arith_tmp % self._arith_max
+            tmp_v -= (self._arith_tmp+1)
         elif self._arith_tmp in range(self._arith_max*2, self._arith_max*3):
             tmp_val.byteswap(2)
-            tmp_val = tmp_val.uint
+            tmp_v = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
-            tmp_val += self._arith_tmp
+            tmp_v += (self._arith_tmp+1)
         elif self._arith_tmp in range(self._arith_max*3, self._arith_max*4):
             tmp_val.byteswap(2)
-            tmp_val = tmp_val.uint
+            tmp_v = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
-            tmp_val -= self._arith_tmp
-        print tmp_val
-        tmp_bit = Bits(int=tmp_val, length=self._num_bits)
+            tmp_v -= (self._arith_tmp+1)
+        print self._arith_tmp
+        print tmp_v
+        tmp_bit = Bits(int=tmp_v, length=self._num_bits)
         new_val.overwrite(tmp_bit, start)
         self.set_current_value(Bits(new_val))
 
     def _arith_32_8(self):
         self._num_bits = 32
-        self._arith_tmp = self._current_offset//(self._data_len_bytes-1) + 1
         start, end = self._start_end()
         new_val = BitArray(self._default_value).copy()
         tmp_val = new_val[start: end]
+        self._arith_tmp = self._current_offset//(self._data_len_bytes-3)
         if self._arith_tmp in range(0, self._arith_max):
-            tmp_val = tmp_val.uint
-            tmp_val += self._arith_tmp
-        elif self._arith_tmp in range(self._arith_max, self._arith_max*2):
-            tmp_val = tmp_val.uint
+            tmp_v = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
-            tmp_val -= self._arith_tmp
+            tmp_v +=(self._arith_tmp+1)
+        elif self._arith_tmp in range(self._arith_max, self._arith_max*2):
+            tmp_v = tmp_val.uint
+            self._arith_tmp = self._arith_tmp % self._arith_max
+            tmp_v -= (self._arith_tmp+1)
         elif self._arith_tmp in range(self._arith_max*2, self._arith_max*3):
             tmp_val.byteswap(4)
-            tmp_val = tmp_val.uint
+            tmp_v = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
-            tmp_val += self._arith_tmp
+            tmp_v += (self._arith_tmp+1)
         elif self._arith_tmp in range(self._arith_max*3, self._arith_max*4):
             tmp_val.byteswap(4)
-            tmp_val = tmp_val.uint
+            tmp_v = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
-            tmp_val -= self._arith_tmp
-        tmp_bit = Bits(int=tmp_val, length=self._num_bits)
+            tmp_v -= (self._arith_tmp+1)
+        print self._arith_tmp
+        print tmp_v
+        tmp_bit = Bits(int=tmp_v, length=self._num_bits)
         new_val.overwrite(tmp_bit, start)
         self.set_current_value(Bits(new_val))
