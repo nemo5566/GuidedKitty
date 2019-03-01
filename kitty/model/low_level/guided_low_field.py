@@ -177,10 +177,17 @@ class DetField(BaseField):
         self._arith_tmp = self._current_offset//self._data_len_bytes + 1
         if self._arith_tmp <= self._arith_max:
             tmp_val += self._arith_tmp
+
         else:
             self._arith_tmp = self._arith_tmp % self._arith_max
             tmp_val -= self._arith_tmp
-        tmp_bit = Bits(int=tmp_val, length=self._num_bits)
+        if tmp_val < 0:
+            pre = ""
+        else:
+            pre = "u"
+        fmt = '%sint%s:%d=%d' % (pre, "", self._num_bits, tmp_val)
+        tmp_bit = Bits(fmt)
+
         new_val.overwrite(tmp_bit, start)
         self.set_current_value(Bits(new_val))
 
@@ -208,7 +215,12 @@ class DetField(BaseField):
             tmp_v = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
             tmp_v -= (self._arith_tmp+1)
-        tmp_bit = Bits(int=tmp_v, length=self._num_bits)
+        if tmp_v < 0:
+            pre = ""
+        else:
+            pre = "u"
+        fmt = '%sint%s:%d=%d' % (pre, "", self._num_bits, tmp_v)
+        tmp_bit = Bits(fmt)
         new_val.overwrite(tmp_bit, start)
         self.set_current_value(Bits(new_val))
 
@@ -236,6 +248,11 @@ class DetField(BaseField):
             tmp_v = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
             tmp_v -= (self._arith_tmp+1)
-        tmp_bit = Bits(int=tmp_v, length=self._num_bits)
+        if tmp_v < 0:
+            pre = ""
+        else:
+            pre = "u"
+        fmt = '%sint%s:%d=%d' % (pre, "", self._num_bits, tmp_v)
+        tmp_bit = Bits(fmt)
         new_val.overwrite(tmp_bit, start)
         self.set_current_value(Bits(new_val))
