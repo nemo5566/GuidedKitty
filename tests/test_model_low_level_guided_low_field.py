@@ -25,6 +25,6 @@ class DetFieldTests(BaseTestCase):
         mutations = map(lambda x: x.tobytes(), self.get_all_mutations(uut))
         self.assertEqual(set(mutations), set(expected_mutations))
 
-    def testFlipSingleBitOnSingleByte(self):
+    def testDetFieldOn32bits(self):
         expected_mutations = map(lambda i: strToBytes(chr(1 << i)), range(8))
         self._testBase(b'\x00\x00\x00\x00', expected_mutations)
