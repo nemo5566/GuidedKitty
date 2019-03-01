@@ -54,7 +54,6 @@ class DetField(BaseField):
         self._arith_tmp = 1
 
     def _start_end(self):
-        self._current_offset = self._current_index - self._base_number
         if self._strategy_idx < 4:
             start_idx = self._current_offset
         elif 4 <= self._strategy_idx < 6:
@@ -75,27 +74,35 @@ class DetField(BaseField):
         elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations - 1:
             self._strategy_idx = 2
             self._base_number += self._bitflip_2_1_num_mutations
-        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + self._bitflip_4_1_num_mutations - 1:
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + \
+                self._bitflip_4_1_num_mutations - 1:
             self._strategy_idx = 3
             self._base_number += self._bitflip_4_1_num_mutations
-        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations - 1:
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + \
+                self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations - 1:
             self._strategy_idx = 4
             self._base_number += self._bitflip_8_8_num_mutations
-        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations + self._bitflip_16_8_num_mutations - 1:
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + \
+                self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations + \
+                self._bitflip_16_8_num_mutations - 1:
             self._strategy_idx = 5
             self._base_number += self._bitflip_16_8_num_mutations
-        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations + self._bitflip_16_8_num_mutations + self._bitflip_32_8_num_mutations - 1:
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + \
+                self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations + \
+                self._bitflip_16_8_num_mutations + self._bitflip_32_8_num_mutations - 1:
             self._strategy_idx = 6
             self._base_number += self._bitflip_32_8_num_mutations
-        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations + self._bitflip_16_8_num_mutations + self._bitflip_32_8_num_mutations + self._arith_8_8_num_mutations - 1:
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + \
+                self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations + \
+                self._bitflip_16_8_num_mutations + self._bitflip_32_8_num_mutations + self._arith_8_8_num_mutations - 1:
             self._strategy_idx = 7
             self._base_number += self._arith_8_8_num_mutations
-        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations + self._bitflip_16_8_num_mutations + self._bitflip_32_8_num_mutations + self._arith_8_8_num_mutations + self._arith_16_8_num_mutations - 1:
+        elif self._current_index == self._bitflip_1_1_num_mutations + self._bitflip_2_1_num_mutations + \
+                self._bitflip_4_1_num_mutations + self._bitflip_8_8_num_mutations + \
+                self._bitflip_16_8_num_mutations + self._bitflip_32_8_num_mutations + \
+                self._arith_8_8_num_mutations + self._arith_16_8_num_mutations - 1:
             self._strategy_idx = 8
             self._base_number += self._arith_16_8_num_mutations
-        # elif self._current_index == self._base_number + self._arith_32_8_num_mutations -1:
-        #     self._strategy_idx += 1
-        #     self._base_number += self._arith_32_8_num_mutations
         return
 
     def _mutate(self):
@@ -104,14 +111,15 @@ class DetField(BaseField):
         method = getattr(self, method_name)
         method()
         self._get_strategy_idx()
+        self._current_offset = self._current_index - self._base_number
 
     def get_info(self):
         info = super(DetField, self).get_info()
-        # info['strategy'] = 'bit flip'
-        # info['bits to flip'] = self._num_bits
-        # start, end = self._start_end()
-        # info['start bit'] = start
-        # info['end bit'] = end
+        info['strategy'] = self._strategy[self._strategy_idx]
+        info['current offset'] = self._current_offset
+        start, end = self._start_end()
+        info['start bit'] = start
+        info['end bit'] = end
         return info
 
     def hash(self):
