@@ -54,6 +54,7 @@ class DetField(BaseField):
         self._arith_tmp = 1
 
     def _start_end(self):
+        self._current_offset = self._current_index - self._base_number
         if self._strategy_idx < 4:
             start_idx = self._current_offset
         elif 4 <= self._strategy_idx < 6:
@@ -111,15 +112,14 @@ class DetField(BaseField):
         method = getattr(self, method_name)
         method()
         self._get_strategy_idx()
-        self._current_offset = self._current_index - self._base_number
 
     def get_info(self):
         info = super(DetField, self).get_info()
         info['strategy'] = self._strategy[self._strategy_idx]
-        info['current offset'] = self._current_offset
         start, end = self._start_end()
         info['start bit'] = start
         info['end bit'] = end
+        info['current offset'] = self._current_offset
         return info
 
     def hash(self):
