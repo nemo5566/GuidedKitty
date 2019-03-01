@@ -199,8 +199,6 @@ class DetField(BaseField):
             tmp_v = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
             tmp_v -= (self._arith_tmp+1)
-        print self._arith_tmp
-        print tmp_v
         tmp_bit = Bits(int=tmp_v, length=self._num_bits)
         new_val.overwrite(tmp_bit, start)
         self.set_current_value(Bits(new_val))
@@ -229,8 +227,6 @@ class DetField(BaseField):
             tmp_v = tmp_val.uint
             self._arith_tmp = self._arith_tmp % self._arith_max
             tmp_v -= (self._arith_tmp+1)
-        print self._arith_tmp
-        print tmp_v
         tmp_bit = Bits(int=tmp_v, length=self._num_bits)
         new_val.overwrite(tmp_bit, start)
         self.set_current_value(Bits(new_val))
