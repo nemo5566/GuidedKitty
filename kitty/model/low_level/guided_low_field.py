@@ -1,5 +1,5 @@
 """
-
+Deterministic fuzzing field
 
 
 """
@@ -12,6 +12,7 @@ from bitstring import Bits, BitArray
 
 class DetField(BaseField):
     """
+
     """
     _encoder_type_ = BitsEncoder
 
