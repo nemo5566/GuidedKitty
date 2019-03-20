@@ -9,18 +9,21 @@ import os
 from bitstring import Bits, BitArray
 import time
 
+INDIR = None
+OUTDIR = None
 
 class GuidedModel(BaseModel):
     '''
 
     '''
 
-    def __init__(self, name="GuidedModel", indir=None):
+    def __init__(self, name="GuidedModel", indir=None, outdir=None):
         """
 
         :param name:
         """
         super(GuidedModel, self).__init__(name)
+        self.outdir = outdir
         self.indir = indir
         self._pass_det = False
         self._havoc = False
@@ -39,6 +42,8 @@ class GuidedModel(BaseModel):
             if self.indir:
                 KittyException("indir is None")
             else:
+                INDIR = self.indir
+                OUTDIR = self.outdir
                 self._queue_path = os.path.join(self.indir, "queue")
                 os.mkdir(self._queue_path)
             self.check_loops_in_guided()
@@ -213,6 +218,21 @@ class QueueEntry(KittyObject):
 
     def _pivot_inputs(self):
         id = 0
+        q = self._queue
+        queue_path = os.path.join(OUTDIR, "queue")
+        os.mkdir(queue_path)
+        while q:
+            fname = os.path.split(q.fname)[-1]
+            qname = "id:%06u,orig:%s"%(id,fname)
+            nfn = os.path.join(queue_path, qname)
+            os.link(q.fname, nfn)
+            q.fname = nfn
+
+            if q.pass_det:
+                self._mark_as_det_done(q)
+
+            q = q.next
+            id += 1
 
 
     def _cull_queue(self):
@@ -221,5 +241,5 @@ class QueueEntry(KittyObject):
     def _save_if_interesting(self):
         pass
 
-    def _mark_as_det_done(self):
+    def _mark_as_det_done(self, queue):
         pass
