@@ -211,6 +211,10 @@ class QueueEntry(KittyObject):
 
         self._last_path_time = int(time.time()*1000)
 
+    def _pivot_inputs(self):
+        id = 0
+
+
     def _cull_queue(self):
         pass
 
