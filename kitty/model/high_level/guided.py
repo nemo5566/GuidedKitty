@@ -5,6 +5,9 @@ from kitty.model.high_level.base import BaseModel
 from kitty.model.high_level.base import Connection
 from kitty.core import KittyObject, KittyException, khash
 from Queue import PriorityQueue
+import os
+from bitstring import Bits, BitArray
+import time
 
 
 class GuidedModel(BaseModel):
@@ -12,12 +15,13 @@ class GuidedModel(BaseModel):
 
     '''
 
-    def __init__(self, name="GuidedModel"):
+    def __init__(self, name="GuidedModel", indir=None):
         """
 
         :param name:
         """
         super(GuidedModel, self).__init__(name)
+        self.indir = indir
         self._pass_det = False
         self._havoc = False
         self._splicing = False
@@ -27,17 +31,45 @@ class GuidedModel(BaseModel):
         self._graph[self._root_id] = []
         self._sequence_idx = -1
         self._current_node = None
+        self._queue = QueueEntry()
 
 
     def _get_ready(self):
         if not self._ready:
+            if self.indir:
+                KittyException("indir is None")
+            else:
+                self._queue_path = os.path.join(self.indir, "queue")
+                os.mkdir(self._queue_path)
+            self.check_loops_in_guided()
+            num = 0
+            self._sequences = self._get_sequences()
+            assert len(self._sequences)
+            self._reversquences = self._sequences[::-1]
+            self._init_queue()
 
+            # for sequence in self._sequences:
+            #     num += sequence[-1].dst.num_mutations()
+            # self._num_mutations = num
+            # self._ready = True
+            # self._update_state(0)
 
-
-
-
-            pass
-
+    def _init_queue(self):
+        for sq in self._reversquences:
+            sqname = ""
+            sqlen = 0
+            sqbit = BitArray()
+            for i in sq:
+                sqname = sqname + "->" + i.dst.get_name()
+                sqrender = i.dst.render()
+                sqlen += sqrender.len
+                sqbit.append(sqrender)
+            sqname = "root" + sqname
+            sqfilename = os.path.join(self.indir, sqname)
+            f = open(sqfilename, "wb")
+            sqbit.tofile(f)
+            f.close()
+            self._queue._add_to_queue(sqfilename, sqlen)
 
     def num_mutations(self):
         '''
@@ -54,7 +86,6 @@ class GuidedModel(BaseModel):
             sequences.append(new_sequence)
             sequences.extend(self._get_sequences(new_sequence))
         return sequences
-
 
     def hash(self):
         hashed = super(GuidedModel, self).hash()
@@ -78,7 +109,7 @@ class GuidedModel(BaseModel):
             raise KittyException('loop detected in model: %s' % path)
         current = current if current else self._root
         for conn in self._graph[current.hash()]:
-            self.check_loops_in_grpah(conn.dst, visited + [conn.src])
+            self.check_loops_in_guided(conn.dst, visited + [conn.src])
 
     def connect(self, src, dst=None, callback=None):
         '''
@@ -100,22 +131,12 @@ class GuidedModel(BaseModel):
             self._graph[dst_id] = []
 
 
-
-
-
-
-
-
-class Queue(PriorityQueue):
+class QueueNode(KittyObject):
     """
 
     """
-    def __init__(self, name='Queue'):
-        """
-
-        :param name:
-        """
-        super(Queue, self).__init__(name)
+    def __init__(self, name='QueueNode'):
+        super(QueueNode, self).__init__(name)
         self.fname = None
         self.len = 0
         self.cal_failed = False
@@ -133,6 +154,68 @@ class Queue(PriorityQueue):
         self.depth = 0
         self.trace_mini = None
         self.tc_ref = 0
+        self.next = None
+        self.next_100 = None
 
 
+class QueueEntry(KittyObject):
+    """
 
+    """
+
+    def __init__(self, name='QueueEntry'):
+        """
+
+        :param name:
+        """
+        super(QueueEntry, self).__init__(name)
+        self._queue_list = []
+        self._queue = None
+        self._queue_cur = None
+        self._queue_top = None
+        self._queue_prev100 = None
+        self._reversquences = None
+        self._cur_depth = 0
+        self._max_depth = 1000
+        self._queue_paths = 0
+        self._pending_not_fuzzed = 0
+        self._cycles_no_finds = 0
+        self._last_path_time = None
+
+    def _add_to_queue(self, sqname, len, pass_det=0):
+        if sqname == None or len == None:
+            KittyException("add to queue error")
+        q = QueueNode()
+        q.fname = sqname
+        q.len = len
+        q.depth = self._cur_depth + 1
+
+        self._queue_list.append(q)
+
+        if q.depth > self._max_depth:
+            self._max_depth = q.depth
+
+        if self._queue_top:
+            self._queue_top.next = q
+            self._queue_top = q
+        else:
+            self._queue_prev100 = self._queue = self._queue_top = q
+
+        self._queue_paths += 1
+        self._pending_not_fuzzed += 1
+        self._cycles_no_finds = 0
+
+        if self._queue_paths // 100:
+            self._queue_prev100.next = q
+            self._queue_prev100 = q
+
+        self._last_path_time = int(time.time()*1000)
+
+    def _cull_queue(self):
+        pass
+
+    def _save_if_interesting(self):
+        pass
+
+    def _mark_as_det_done(self):
+        pass
