@@ -35,6 +35,7 @@ class GuidedModel(BaseModel):
         self._sequence_idx = -1
         self._current_node = None
         self._queue = QueueEntry()
+        self._det_num_mutations = 0
 
 
     def _get_ready(self):
@@ -48,15 +49,19 @@ class GuidedModel(BaseModel):
                 os.mkdir(self._queue_path)
             self.check_loops_in_guided()
             num = 0
+
+            for sequence in self._sequences:
+                num += sequence[-1].dst.num_mutations()
+            self._det_num_mutations = num
             self._sequences = self._get_sequences()
             assert len(self._sequences)
             self._reversquences = self._sequences[::-1]
             self._init_queue()
+            self._queue._pivot_inputs()
+            self._load_extras()
 
-            # for sequence in self._sequences:
-            #     num += sequence[-1].dst.num_mutations()
-            # self._num_mutations = num
-            # self._ready = True
+
+            self._ready = True
             # self._update_state(0)
 
     def _init_queue(self):
@@ -75,6 +80,10 @@ class GuidedModel(BaseModel):
             sqbit.tofile(f)
             f.close()
             self._queue._add_to_queue(sqfilename, sqlen)
+
+    def _load_extras(self):
+        pass
+
 
     def num_mutations(self):
         '''
