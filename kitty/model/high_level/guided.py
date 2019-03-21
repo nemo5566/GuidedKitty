@@ -12,17 +12,19 @@ import time
 INDIR = None
 OUTDIR = None
 
+
 class GuidedModel(BaseModel):
     '''
 
     '''
 
-    def __init__(self, name="GuidedModel", indir=None, outdir=None):
+    def __init__(self, name="GuidedModel", indir=None, outdir=None, skip_det = False):
         """
 
         :param name:
         """
         super(GuidedModel, self).__init__(name)
+        self.skip_det = skip_det
         self.outdir = outdir
         self.indir = indir
         self._pass_det = False
@@ -37,19 +39,16 @@ class GuidedModel(BaseModel):
         self._queue = QueueEntry()
         self._det_num_mutations = 0
 
-
     def _get_ready(self):
         if not self._ready:
-            if self.indir:
-                KittyException("indir is None")
-            else:
-                INDIR = self.indir
-                OUTDIR = self.outdir
-                self._queue_path = os.path.join(self.indir, "queue")
-                os.mkdir(self._queue_path)
+            if self.indir and self.outdir:
+                KittyException("indir or outdir is None")
+            global INDIR
+            INDIR = self.indir
+            global OUTDIR
+            OUTDIR = self.outdir
             self.check_loops_in_guided()
             num = 0
-
             for sequence in self._sequences:
                 num += sequence[-1].dst.num_mutations()
             self._det_num_mutations = num
@@ -60,6 +59,9 @@ class GuidedModel(BaseModel):
             self._queue._pivot_inputs()
             self._load_extras()
 
+            # TODO: maybe perform_dry_run here?
+
+            self._queue._cull_queue()
 
             self._ready = True
             # self._update_state(0)
@@ -75,14 +77,21 @@ class GuidedModel(BaseModel):
                 sqlen += sqrender.len
                 sqbit.append(sqrender)
             sqname = "root" + sqname
-            sqfilename = os.path.join(self.indir, sqname)
+            sqfilename = os.path.join(INDIR, sqname)
             f = open(sqfilename, "wb")
             sqbit.tofile(f)
             f.close()
-            self._queue._add_to_queue(sqfilename, sqlen)
+            self._queue._add_to_queue(sqfilename, sq, sqlen)
 
     def _load_extras(self):
+        # TODO:need to load the extras in fields
         pass
+
+    def _mutate(self):
+
+        self._queue._mutate()
+
+
 
 
     def num_mutations(self):
@@ -149,10 +158,12 @@ class QueueNode(KittyObject):
     """
 
     """
+
     def __init__(self, name='QueueNode'):
         super(QueueNode, self).__init__(name)
         self.fname = None
         self.len = 0
+        self.sequence = None
         self.cal_failed = False
         self.was_fuzzed = False
         self.passed_det = False
@@ -195,14 +206,27 @@ class QueueEntry(KittyObject):
         self._pending_not_fuzzed = 0
         self._cycles_no_finds = 0
         self._last_path_time = None
+        self._queue_cycle = 0
+        self._current_entry = 0
+        self._queue_cur_change = False
+        self._havoc_max = 0
+        self._splicing_max = 0
+        self._splicing_cycle = 0
+        self._havoc_stage_cur = 0
+        self._splicing_stage_cur = 0
+        self._perf_score = 0
 
-    def _add_to_queue(self, sqname, len, pass_det=0):
+
+
+    def _add_to_queue(self, sqname, sequence, length, pass_det=False):
         if sqname == None or len == None:
             KittyException("add to queue error")
         q = QueueNode()
         q.fname = sqname
-        q.len = len
+        q.sequence = sequence
+        q.len = length
         q.depth = self._cur_depth + 1
+        q.passed_det = pass_det
 
         self._queue_list.append(q)
 
@@ -223,16 +247,17 @@ class QueueEntry(KittyObject):
             self._queue_prev100.next = q
             self._queue_prev100 = q
 
-        self._last_path_time = int(time.time()*1000)
+        self._last_path_time = int(time.time() * 1000)
 
     def _pivot_inputs(self):
         id = 0
         q = self._queue
+        global OUTDIR
         queue_path = os.path.join(OUTDIR, "queue")
         os.mkdir(queue_path)
         while q:
             fname = os.path.split(q.fname)[-1]
-            qname = "id:%06u,orig:%s"%(id,fname)
+            qname = "id:%06u,orig:%s" % (id, fname)
             nfn = os.path.join(queue_path, qname)
             os.link(q.fname, nfn)
             q.fname = nfn
@@ -243,8 +268,8 @@ class QueueEntry(KittyObject):
             q = q.next
             id += 1
 
-
     def _cull_queue(self):
+        # TODO:need to implement after sancov finishing
         pass
 
     def _save_if_interesting(self):
@@ -252,3 +277,38 @@ class QueueEntry(KittyObject):
 
     def _mark_as_det_done(self, queue):
         pass
+
+    def _mutate(self):
+
+        if self._queue_cur_change:
+            self._cull_queue()
+            self._calculate_score()
+            self._queue_cur_change = False
+
+        if not self._queue_cur:
+            self._queue_cycle += 1
+            self._current_entry = 0
+            self._queue_cur = self._queue
+
+        if not self._queue_cur.pass_det:
+            self._do_det()
+        else:
+            self._do_havoc_and_splicing()
+
+    def _do_det(self):
+        node = self._queue_cur.sequence[-1].dst
+        if node.mutate():
+            return
+        else:
+            self._queue_cur.pass_det = True
+            node.reset()
+
+
+    def _do_havoc_and_splicing(self):
+
+
+        pass
+
+    def _calculate_score(self):
+
+        self._perf_score = 0
