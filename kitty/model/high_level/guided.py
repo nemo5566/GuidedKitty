@@ -11,6 +11,8 @@ import time
 
 INDIR = None
 OUTDIR = None
+HAVOC_CYCLES_INIT = 1024
+HAVOC_CYCLES = 128
 
 
 class GuidedModel(BaseModel):
@@ -215,6 +217,7 @@ class QueueEntry(KittyObject):
         self._havoc_stage_cur = 0
         self._splicing_stage_cur = 0
         self._perf_score = 0
+        global HAVOC_CYCLES, HAVOC_CYCLES_INIT
 
 
 
@@ -305,7 +308,8 @@ class QueueEntry(KittyObject):
 
 
     def _do_havoc_and_splicing(self):
-
+        if not self._splicing_cycle:
+            self._havoc_max = self._
 
         pass
 
