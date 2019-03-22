@@ -4,15 +4,20 @@
 from kitty.model.high_level.base import BaseModel
 from kitty.model.high_level.base import Connection
 from kitty.core import KittyObject, KittyException, khash
-from Queue import PriorityQueue
-import os
 from bitstring import Bits, BitArray
+
+
+import os
 import time
+import random
+import math
+
 
 INDIR = None
 OUTDIR = None
 HAVOC_CYCLES_INIT = 1024
-HAVOC_CYCLES = 128
+HAVOC_CYCLES = 256
+SPLICE_HAVOC = 32
 
 
 class GuidedModel(BaseModel):
@@ -20,7 +25,7 @@ class GuidedModel(BaseModel):
 
     '''
 
-    def __init__(self, name="GuidedModel", indir=None, outdir=None, skip_det = False):
+    def __init__(self, name="GuidedModel", indir=None, outdir=None, skip_det=False):
         """
 
         :param name:
@@ -92,9 +97,6 @@ class GuidedModel(BaseModel):
     def _mutate(self):
 
         self._queue._mutate()
-
-
-
 
     def num_mutations(self):
         '''
@@ -217,9 +219,7 @@ class QueueEntry(KittyObject):
         self._havoc_stage_cur = 0
         self._splicing_stage_cur = 0
         self._perf_score = 0
-        global HAVOC_CYCLES, HAVOC_CYCLES_INIT
-
-
+        global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC
 
     def _add_to_queue(self, sqname, sequence, length, pass_det=False):
         if sqname == None or len == None:
@@ -253,7 +253,7 @@ class QueueEntry(KittyObject):
         self._last_path_time = int(time.time() * 1000)
 
     def _pivot_inputs(self):
-        id = 0
+        pivot_id = 0
         q = self._queue
         global OUTDIR
         queue_path = os.path.join(OUTDIR, "queue")
@@ -269,7 +269,7 @@ class QueueEntry(KittyObject):
                 self._mark_as_det_done(q)
 
             q = q.next
-            id += 1
+            pivot_id += 1
 
     def _cull_queue(self):
         # TODO:need to implement after sancov finishing
@@ -306,11 +306,30 @@ class QueueEntry(KittyObject):
             self._queue_cur.pass_det = True
             node.reset()
 
-
     def _do_havoc_and_splicing(self):
         if not self._splicing_cycle:
-            self._havoc_max = self._
+            self._havoc_max = HAVOC_CYCLES_INIT * (
+                        self._perf_score / 100)  # need to add havoc_div according to exec secs
+        else:
+            self._havoc_max = SPLICE_HAVOC * self._perf_score / 100
+        if self._havoc_max < 16:
+            self._havoc_max = 16
+        temp_len = self._queue_cur.len
+        stage_cur = 0
+        if stage_cur < self._havoc_max:
+            use_stacking = math.pow(2, random.randint(1, 8))
+            for i in range(use_stacking):
+                k = random.randint(1, 16)
+                # TODO:implement the havoc cases
+                if k == 1:
+                    self._queue_cur
 
+
+
+
+            stage_cur += 1
+
+    def _splicing(self):
         pass
 
     def _calculate_score(self):
