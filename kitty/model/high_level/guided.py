@@ -56,6 +56,7 @@ class GuidedModel(BaseModel):
             OUTDIR = self.outdir
             self.check_loops_in_guided()
             num = 0
+            self._sequences = self._get_sequences()
             for sequence in self._sequences:
                 num += sequence[-1].dst.num_mutations()
             self._det_num_mutations = num
@@ -113,6 +114,13 @@ class GuidedModel(BaseModel):
             sequences.append(new_sequence)
             sequences.extend(self._get_sequences(new_sequence))
         return sequences
+    
+    def get_sequence(self):
+        self._get_ready()
+        assert self._queue.queue_cur.sequence
+        return self._queue._queue_cur.sequence[:]
+            
+            
 
     def hash(self):
         hashed = super(GuidedModel, self).hash()
@@ -221,7 +229,7 @@ class QueueEntry(KittyObject):
         self._perf_score = 0
         global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC
 
-    def _add_to_queue(self, sqname, sequence, length, pass_det=False):
+    def _add_to_queue(self, sqname, sequence, length, passed_det=False):
         if sqname == None or len == None:
             KittyException("add to queue error")
         q = QueueNode()
@@ -229,7 +237,7 @@ class QueueEntry(KittyObject):
         q.sequence = sequence
         q.len = length
         q.depth = self._cur_depth + 1
-        q.passed_det = pass_det
+        q.passed_det = passed_det
 
         self._queue_list.append(q)
 
@@ -293,7 +301,7 @@ class QueueEntry(KittyObject):
             self._current_entry = 0
             self._queue_cur = self._queue
 
-        if not self._queue_cur.pass_det:
+        if not self._queue_cur.passed_det:
             self._do_det()
         else:
             self._do_havoc_and_splicing()
@@ -335,3 +343,7 @@ class QueueEntry(KittyObject):
     def _calculate_score(self):
 
         self._perf_score = 0
+
+    @property
+    def queue_cur(self):
+        return self._queue_cur
