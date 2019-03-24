@@ -118,7 +118,7 @@ class GuidedModel(BaseModel):
     def get_sequence(self):
         self._get_ready()
         assert self._queue.queue_cur.sequence
-        return self._queue._queue_cur.sequence[:]
+        return self._queue.queue_cur.sequence[:]
             
             
 
@@ -320,9 +320,12 @@ class QueueEntry(KittyObject):
                         self._perf_score / 100)  # need to add havoc_div according to exec secs
         else:
             self._havoc_max = SPLICE_HAVOC * self._perf_score / 100
+        node = self._queue_cur.sequence[-1].dst
+        node._current_index = 1
+        node_val = BitArray(node.render()).copy()
         if self._havoc_max < 16:
             self._havoc_max = 16
-        temp_len = self._queue_cur.len
+        temp_len = node_val.len
         stage_cur = 0
         if stage_cur < self._havoc_max:
             use_stacking = math.pow(2, random.randint(1, 8))
@@ -330,7 +333,10 @@ class QueueEntry(KittyObject):
                 k = random.randint(1, 16)
                 # TODO:implement the havoc cases
                 if k == 1:
-                    self._queue_cur
+                    ranstart = random.randint(0, temp_len -1)
+                    node_val.invert(range(ranstart, ranstart + 1))
+                    node.set_current_value(Bits(node_val))
+
 
 
 
@@ -343,6 +349,9 @@ class QueueEntry(KittyObject):
     def _calculate_score(self):
 
         self._perf_score = 0
+
+    def save_if_interesting(self):
+        pass
 
     @property
     def queue_cur(self):
