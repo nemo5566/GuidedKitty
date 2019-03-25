@@ -321,6 +321,10 @@ class QueueEntry(KittyObject):
             node.reset()
 
     def _do_havoc_and_splicing(self):
+        self._do_havoc()
+
+
+    def _do_havoc(self):
         if not self._splicing_cycle:
             self._havoc_max = HAVOC_CYCLES_INIT * (
                     self._perf_score / 100)  # need to add havoc_div according to exec secs
