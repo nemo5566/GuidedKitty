@@ -6,18 +6,20 @@ from kitty.model.high_level.base import Connection
 from kitty.core import KittyObject, KittyException, khash
 from bitstring import Bits, BitArray
 
-
 import os
 import time
 import random
 import math
-
 
 INDIR = None
 OUTDIR = None
 HAVOC_CYCLES_INIT = 1024
 HAVOC_CYCLES = 256
 SPLICE_HAVOC = 32
+HAVOC_BLK_SMALL = 32
+HAVOC_BLK_MEDIUM = 128
+HAVOC_BLK_LARGE = 1500
+HAVOC_BLK_XL = 32768
 
 
 class GuidedModel(BaseModel):
@@ -114,13 +116,11 @@ class GuidedModel(BaseModel):
             sequences.append(new_sequence)
             sequences.extend(self._get_sequences(new_sequence))
         return sequences
-    
+
     def get_sequence(self):
         self._get_ready()
         assert self._queue.queue_cur.sequence
         return self._queue.queue_cur.sequence[:]
-            
-            
 
     def hash(self):
         hashed = super(GuidedModel, self).hash()
@@ -206,6 +206,8 @@ class QueueEntry(KittyObject):
         :param name:
         """
         super(QueueEntry, self).__init__(name)
+        self._extras_cnt = 0
+        self._a_extras_cnt = 0
         self._queue_list = []
         self._queue = None
         self._queue_cur = None
@@ -227,7 +229,9 @@ class QueueEntry(KittyObject):
         self._havoc_stage_cur = 0
         self._splicing_stage_cur = 0
         self._perf_score = 0
-        global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC
+        self._run_over10m = False  # Run time over 10 minutes?
+        global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC, HAVOC_BLK_LARGE, HAVOC_BLK_SMALL, HAVOC_BLK_MEDIUM, \
+            HAVOC_BLK_XL
 
     def _add_to_queue(self, sqname, sequence, length, passed_det=False):
         if sqname == None or len == None:
@@ -317,7 +321,7 @@ class QueueEntry(KittyObject):
     def _do_havoc_and_splicing(self):
         if not self._splicing_cycle:
             self._havoc_max = HAVOC_CYCLES_INIT * (
-                        self._perf_score / 100)  # need to add havoc_div according to exec secs
+                    self._perf_score / 100)  # need to add havoc_div according to exec secs
         else:
             self._havoc_max = SPLICE_HAVOC * self._perf_score / 100
         node = self._queue_cur.sequence[-1].dst
@@ -328,18 +332,151 @@ class QueueEntry(KittyObject):
         temp_len = node_val.len
         stage_cur = 0
         if stage_cur < self._havoc_max:
-            use_stacking = math.pow(2, random.randint(1, 8))
+            use_stacking = int(math.pow(2, random.randint(1, 8)))
             for i in range(use_stacking):
-                k = random.randint(1, 16)
+                k = random.randint(1, 15 + (2 if self._extras_cnt + self._a_extras_cnt else 0))
                 # TODO:implement the havoc cases
                 if k == 1:
-                    ranstart = random.randint(0, temp_len -1)
+                    ranstart = random.randint(0, temp_len - 1)
                     node_val.invert(range(ranstart, ranstart + 1))
                     node.set_current_value(Bits(node_val))
+                elif k == 2:
+                    # TODO add interesting value
+                    pass
+                elif k == 3:
+                    # Set word to interesting value, randomly choosing endian.
+                    pass
+                elif k == 4:
+                    # Set dword to interesting value, randomly choosing endian.
+                    pass
+                elif k == 5:
+                    # Randomly subtract from byte.
+                    if temp_len < 8:
+                        continue
+                    ranstart = random.randint(0, temp_len - 1)
+                    tmp_uint = node_val[ranstart: ranstart + 8].uint - 1
+                    tmp_b = BitArray(uint=tmp_uint, length=8)
+                    del node_val[ranstart: ranstart + 8]
+                    node_val.insert(tmp_b, ranstart)
+                    node.set_current_value(Bits(node_val))
+                elif k == 6:
+                    if temp_len < 8:
+                        continue
+                    ranstart = random.randint(0, temp_len - 1)
+                    tmp_uint = node_val[ranstart: ranstart + 8].uint + 1
+                    tmp_b = BitArray(uint=tmp_uint, length=8)
+                    del node_val[ranstart: ranstart + 8]
+                    node_val.insert(tmp_b, ranstart)
+                    node.set_current_value(Bits(node_val))
+                elif k == 7:
+                    if temp_len < 16:
+                        continue
+                    ranstart = random.randint(0, temp_len - 1)
+                    if random.randint(0, 1):
+                        tmp_uint = node_val[ranstart: ranstart + 16].uintbe - 1
+                        tmp_b = BitArray(uintbe=tmp_uint, length=16)
+                        del node_val[ranstart: ranstart + 16]
+                        node_val.insert(tmp_b, ranstart)
+                        node.set_current_value(Bits(node_val))
+                    else:
+                        tmp_uint = node_val[ranstart: ranstart + 16].uintle - 1
+                        tmp_b = BitArray(uintle=tmp_uint, length=16)
+                        del node_val[ranstart: ranstart + 16]
+                        node_val.insert(tmp_b, ranstart)
+                        node.set_current_value(Bits(node_val))
+                elif k == 8:
+                    if temp_len < 16:
+                        continue
+                    ranstart = random.randint(0, temp_len - 1)
+                    if random.randint(0, 1):
+                        tmp_uint = node_val[ranstart: ranstart + 16].uintbe + 1
+                        tmp_b = BitArray(uintbe=tmp_uint, length=16)
+                        del node_val[ranstart: ranstart + 16]
+                        node_val.insert(tmp_b, ranstart)
+                        node.set_current_value(Bits(node_val))
+                    else:
+                        tmp_uint = node_val[ranstart: ranstart + 16].uintle + 1
+                        tmp_b = BitArray(uintle=tmp_uint, length=16)
+                        del node_val[ranstart: ranstart + 16]
+                        node_val.insert(tmp_b, ranstart)
+                        node.set_current_value(Bits(node_val))
+                elif k == 9:
+                    if temp_len < 32:
+                        continue
+                    ranstart = random.randint(0, temp_len - 1)
+                    if random.randint(0, 1):
+                        tmp_uint = node_val[ranstart: ranstart + 16].uintbe - 1
+                        tmp_b = BitArray(uintbe=tmp_uint, length=16)
+                        del node_val[ranstart: ranstart + 16]
+                        node_val.insert(tmp_b, ranstart)
+                        node.set_current_value(Bits(node_val))
+                    else:
+                        tmp_uint = node_val[ranstart: ranstart + 16].uintle - 1
+                        tmp_b = BitArray(uintle=tmp_uint, length=16)
+                        del node_val[ranstart: ranstart + 16]
+                        node_val.insert(tmp_b, ranstart)
+                        node.set_current_value(Bits(node_val))
+                elif k == 10:
+                    if temp_len < 32:
+                        continue
+                    ranstart = random.randint(0, temp_len - 1)
+                    if random.randint(0, 1):
+                        tmp_uint = node_val[ranstart: ranstart + 16].uintbe + 1
+                        tmp_b = BitArray(uintbe=tmp_uint, length=16)
+                        del node_val[ranstart: ranstart + 16]
+                        node_val.insert(tmp_b, ranstart)
+                        node.set_current_value(Bits(node_val))
+                    else:
+                        tmp_uint = node_val[ranstart: ranstart + 16].uintle + 1
+                        tmp_b = BitArray(uintle=tmp_uint, length=16)
+                        del node_val[ranstart: ranstart + 16]
+                        node_val.insert(tmp_b, ranstart)
+                        node.set_current_value(Bits(node_val))
+                elif k == 11:
+                    if temp_len < 8:
+                        continue
+                    ranstart = random.randint(0, temp_len - 1)
+                    node_val[ranstart: ranstart + 8] ^= Bits(int=random.randint(1, 255), length=8)
+                    node.set_current_value(Bits(node_val))
+                elif k == 12 or k == 13:
+                    #  Delete bytes. We're making this a bit more likely
+                    #  than insertion (the next option) in hopes of keeping
+                    #  files reasonably small.
+                    if temp_len < 8:
+                        continue
+                    del_len = self._choose_block_len(temp_len - 1)
+                    ranstart = random.randint(0, temp_len - del_len + 1)
+                    del node_val[ranstart, ranstart + del_len]
+                    node.set_current_value(Bits(node_val))
+                    temp_len -= del_len
+                elif k == 14:
+                    # Clone bytes (75%) or insert a block of constant bytes (25%).
+                    actually_clone = random.randint(0, 3)
+                    clone_to = random.randint(0, temp_len - 1)
+                    if actually_clone:
+                        clone_len = self._choose_block_len(temp_len)
+                        clone_from = random.randint(0, temp_len - clone_len + 1)
+                        temp_clone = node_val[clone_from, clone_from + clone_len]
+                        node_val.insert(temp_clone, clone_to)
+                    else:
+                        clone_len = self._choose_block_len(HAVOC_BLK_XL)
+                        temp_clone = BitArray()
+                        for _ in range(0, clone_len / 8):
+                            temp_clone += BitArray(uint=random.randint(1, 255), length=8)
+                        clone_len = temp_clone.len
+                        node_val.insert(temp_clone, clone_to)
+                    temp_len += clone_len
+                    node.set_current_value(Bits(node_val))
 
-
-
-
+                elif k == 15:
+                    # Overwrite bytes with a randomly selected chunk (75%) or fixed bytes (25%).
+                    actually_clone = random.randint(0, 3)
+                elif k == 16:
+                    # Overwrite bytes with an extra.
+                    pass
+                elif k == 17:
+                    # nsert an extra. Do the same dice-rolling stuff as for the previous case.
+                    pass
 
             stage_cur += 1
 
@@ -356,3 +493,32 @@ class QueueEntry(KittyObject):
     @property
     def queue_cur(self):
         return self._queue_cur
+
+    def _choose_block_len(self, limit):
+        """
+         Helper to choose random block len for block operations in fuzz_one().
+         Doesn't return zero, provided that max_len is > 0.
+        :param limit:
+        :return:
+        """
+        min_value = max_value = 0
+        rlim = min(self._queue_cycle, 3)
+        if not self._run_over10m:
+            rlim = 1
+        tmp_r = random.randint(0, rlim)
+        if tmp_r == 0:
+            min_value = 1
+            max_value = HAVOC_BLK_SMALL
+        elif tmp_r == 1:
+            min_value = HAVOC_BLK_SMALL
+            max_value = HAVOC_BLK_MEDIUM
+        else:
+            if random.randint(0, 10):
+                min_value = HAVOC_BLK_MEDIUM
+                max_value = HAVOC_BLK_LARGE
+            else:
+                min_value = HAVOC_BLK_LARGE
+                max_value = HAVOC_BLK_XL
+        if min_value >= limit:
+            min_value = 1
+        return min_value + random.randint(min(max_value, limit) - min_value + 1)
