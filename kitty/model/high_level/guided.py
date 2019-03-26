@@ -21,6 +21,7 @@ HAVOC_BLK_MEDIUM = 128
 HAVOC_BLK_LARGE = 1500
 HAVOC_BLK_XL = 32768
 HAVOC_MAX_MULT = 16
+SPLICE_CYCLES = 15
 
 
 class GuidedModel(BaseModel):
@@ -207,6 +208,7 @@ class QueueEntry(KittyObject):
         :param name:
         """
         super(QueueEntry, self).__init__(name)
+        self._splicing_with = -1
         self._extras_cnt = 0
         self._a_extras_cnt = 0
         self._queue_list = []
@@ -232,8 +234,10 @@ class QueueEntry(KittyObject):
         self._perf_score = 0
         self._run_over10m = False  # Run time over 10 minutes?
         self._havoc_queue = 0
+        self._unique_crashes = 0
+        self._new_hit_cnt = 0
         global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC, HAVOC_BLK_LARGE, HAVOC_BLK_SMALL, HAVOC_BLK_MEDIUM, \
-            HAVOC_BLK_XL, HAVOC_MAX_MULT
+            HAVOC_BLK_XL, HAVOC_MAX_MULT, SPLICE_CYCLES
 
     def _add_to_queue(self, sqname, sequence, length, passed_det=False):
         if sqname == None or len == None:
@@ -322,6 +326,8 @@ class QueueEntry(KittyObject):
 
     def _do_havoc_and_splicing(self):
         self._do_havoc()
+        self._new_hit_cnt = self._queue_paths + self._unique_crashes  # ????
+        self._do_splicing()
 
 
     def _do_havoc(self):
@@ -515,8 +521,28 @@ class QueueEntry(KittyObject):
                 self._havoc_queue = self._queue_paths
             stage_cur += 1
 
-    def _splicing(self):
-        pass
+    def _do_splicing(self):
+        target = None
+        while not target:
+            if self._splicing_cycle < SPLICE_CYCLES and self._queue_paths > 1 and self._queue_cur.len > 8:
+                while True:
+                    tid = random.randint(0, self._queue_paths)
+                    if tid != self._current_entry:
+                        break
+                target = self._queue
+                while tid >= 100:
+                    target = target.next_100
+                    tid -= 100
+                while tid > 0:
+                    target = target.next
+                    tid -= 1
+                while target.len <16 or target == self._queue_cur:
+                    target = target.next
+                    self._splicing_with += 1
+            
+
+            self._splicing_cycle += 1
+
 
     def _calculate_score(self):
 
