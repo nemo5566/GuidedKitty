@@ -541,7 +541,7 @@ class QueueEntry(KittyObject):
                     self._splicing_with += 1
             
 
-            self._splicing_cycle += 1
+        self._splicing_cycle += 1
 
 
     def _calculate_score(self):
