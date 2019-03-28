@@ -208,6 +208,7 @@ class QueueEntry(KittyObject):
         :param name:
         """
         super(QueueEntry, self).__init__(name)
+        self.pending_favored = 0
         self._splicing_with = -1
         self._extras_cnt = 0
         self._a_extras_cnt = 0
@@ -236,6 +237,8 @@ class QueueEntry(KittyObject):
         self._havoc_queue = 0
         self._unique_crashes = 0
         self._new_hit_cnt = 0
+        self._havoc_num = 0
+        self._stop_soon = False
         global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC, HAVOC_BLK_LARGE, HAVOC_BLK_SMALL, HAVOC_BLK_MEDIUM, \
             HAVOC_BLK_XL, HAVOC_MAX_MULT, SPLICE_CYCLES
 
@@ -325,10 +328,16 @@ class QueueEntry(KittyObject):
             node.reset()
 
     def _do_havoc_and_splicing(self):
-        self._do_havoc()
-        self._new_hit_cnt = self._queue_paths + self._unique_crashes  # ????
-        self._do_splicing()
-
+        while True:
+            if self._do_havoc():
+                return
+            else:
+                self._new_hit_cnt = self._queue_paths + self._unique_crashes  # ????
+                if self._do_splicing():
+                    break
+                else:
+                    self._havoc_num = 0
+        self._abandon_entry()
 
     def _do_havoc(self):
         if not self._splicing_cycle:
@@ -343,8 +352,7 @@ class QueueEntry(KittyObject):
         if self._havoc_max < 16:
             self._havoc_max = 16
         temp_len = node_val.len
-        stage_cur = 0
-        if stage_cur < self._havoc_max:
+        if self._havoc_num < self._havoc_max:
             use_stacking = int(math.pow(2, random.randint(1, 8)))
             for i in range(use_stacking):
                 k = random.randint(1, 15 + (2 if self._extras_cnt + self._a_extras_cnt else 0))
@@ -519,7 +527,10 @@ class QueueEntry(KittyObject):
                     self._havoc_max *= 2
                     self._perf_score *=2
                 self._havoc_queue = self._queue_paths
-            stage_cur += 1
+            self._havoc_num += 1
+            return 1
+        else:
+            return 0
 
     def _do_splicing(self):
         target = None
@@ -542,6 +553,8 @@ class QueueEntry(KittyObject):
                     while target.len < 16 or target == self._queue_cur:
                         target = target.next
                         self._splicing_with += 1
+                    if target:
+                        break
                     tf = open(target.fname, "rb")
                     if tf < 0:
                         KittyException("queue file open error")
@@ -558,24 +571,27 @@ class QueueEntry(KittyObject):
                             l_loc = i
                             if f_loc == -1:
                                 f_loc = i
-                    split_at = f_loc + random.randint(0, l_loc - f_loc)
-                    tlen = target.len
-                    newbuff = tbuff[0: split_at]  # type: str
-                    newbuff += qbuff[split_at: tlen]
-                    self._update_queue_cur(newbuff)
                     self._splicing_cycle += 1
                 else:
-                    return -1
+                    return 1
+        split_at = f_loc + random.randint(0, l_loc - f_loc)
+        tlen = target.len
+        newbuff = tbuff[0: split_at]  # type: str
+        newbuff += qbuff[split_at: tlen]
+        self._update_queue_cur(newbuff)
+        return 0
 
-
-
+    def _abandon_entry(self):
+        self._splicing_with = -1
+        if not self._stop_soon and not self._queue_cur.cal_failed and not self._queue_cur.was_fazzed:
+            self._queue_cur.was_fazzed = 1
+            self._pending_not_fuzzed -= 1
+            if self._queue_cur.favored:
+                self.pending_favored -= 1
+        return
 
     def _update_queue_cur(self, newbuff):
         pass
-
-
-
-
 
     def _calculate_score(self):
 
@@ -616,3 +632,5 @@ class QueueEntry(KittyObject):
         if min_value >= limit:
             min_value = 1
         return min_value + random.randint(min(max_value, limit) - min_value + 1)
+
+
