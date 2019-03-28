@@ -1,5 +1,5 @@
 '''
-
+written by ly
 '''
 from kitty.model.high_level.base import BaseModel
 from kitty.model.high_level.base import Connection
@@ -324,12 +324,19 @@ class QueueEntry(KittyObject):
         if node.mutate():
             return
         else:
+            node._det_finish = True
             self._queue_cur.pass_det = True
             node.reset()
 
     def _do_havoc_and_splicing(self):
         while True:
             if self._do_havoc():
+                # TODO: Add the following code to the postrun
+                # if self._queue_paths != self._havoc_queue:
+                #     if self._perf_score <= HAVOC_MAX_MULT * 100:
+                #         self._havoc_max *= 2
+                #         self._perf_score *= 2
+                #     self._havoc_queue = self._queue_paths
                 return
             else:
                 self._new_hit_cnt = self._queue_paths + self._unique_crashes  # ????
@@ -522,11 +529,6 @@ class QueueEntry(KittyObject):
                 elif k == 17:
                     # insert an extra. Do the same dice-rolling stuff as for the previous case.
                     pass
-            if self._queue_paths != self._havoc_queue:
-                if self._perf_score <= HAVOC_MAX_MULT * 100:
-                    self._havoc_max *= 2
-                    self._perf_score *=2
-                self._havoc_queue = self._queue_paths
             self._havoc_num += 1
             return 1
         else:
