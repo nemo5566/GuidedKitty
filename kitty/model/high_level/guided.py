@@ -523,25 +523,58 @@ class QueueEntry(KittyObject):
 
     def _do_splicing(self):
         target = None
-        while not target:
-            if self._splicing_cycle < SPLICE_CYCLES and self._queue_paths > 1 and self._queue_cur.len > 8:
-                while True:
-                    tid = random.randint(0, self._queue_paths)
-                    if tid != self._current_entry:
-                        break
-                target = self._queue
-                while tid >= 100:
-                    target = target.next_100
-                    tid -= 100
-                while tid > 0:
-                    target = target.next
-                    tid -= 1
-                while target.len <16 or target == self._queue_cur:
-                    target = target.next
-                    self._splicing_with += 1
-            
+        f_loc = -1
+        l_loc = -1
+        while f_loc < 0 or l_loc < 2 or f_loc == l_loc:
+            while not target:
+                if self._splicing_cycle < SPLICE_CYCLES and self._queue_paths > 1 and self._queue_cur.len > 8:
+                    while True:
+                        tid = random.randint(0, self._queue_paths)
+                        if tid != self._current_entry:
+                            break
+                    target = self._queue
+                    while tid >= 100:
+                        target = target.next_100
+                        tid -= 100
+                    while tid > 0:
+                        target = target.next
+                        tid -= 1
+                    while target.len < 16 or target == self._queue_cur:
+                        target = target.next
+                        self._splicing_with += 1
+                    tf = open(target.fname, "rb")
+                    if tf < 0:
+                        KittyException("queue file open error")
+                    tbuff = tf.read()
+                    tf.close()
+                    qf = open(self._queue_cur.fname, "rb")
+                    if qf < 0:
+                        KittyException("queue file open error")
+                    qbuff = qf.read()
+                    qf.close()
+                    minlen = min(len(tbuff), len(qbuff))
+                    for i in range(0, minlen):
+                        if qbuff[i] != tbuff[i]:
+                            l_loc = i
+                            if f_loc == -1:
+                                f_loc = i
+                    split_at = f_loc + random.randint(0, l_loc - f_loc)
+                    tlen = target.len
+                    newbuff = tbuff[0: split_at]  # type: str
+                    newbuff += qbuff[split_at: tlen]
+                    self._update_queue_cur(newbuff)
+                    self._splicing_cycle += 1
+                else:
+                    return -1
 
-        self._splicing_cycle += 1
+
+
+
+    def _update_queue_cur(self, newbuff):
+        pass
+
+
+
 
 
     def _calculate_score(self):
