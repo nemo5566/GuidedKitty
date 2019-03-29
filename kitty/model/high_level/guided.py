@@ -96,7 +96,7 @@ class GuidedModel(BaseModel):
             self._queue._add_to_queue(sqfilename, sq, sqlen)
 
     def _load_extras(self):
-        # TODO:need to load the extras in fields
+        # TODO: need to load the extras in fields
         pass
 
     def _mutate(self):
@@ -108,7 +108,7 @@ class GuidedModel(BaseModel):
         :return: number of mutations in the model
         '''
         self._get_ready()
-        return self._num_mutations
+        return self._det_num_mutations
 
     def _get_sequences(self, sequence=[]):
         sequences = []
@@ -243,6 +243,14 @@ class QueueEntry(KittyObject):
             HAVOC_BLK_XL, HAVOC_MAX_MULT, SPLICE_CYCLES
 
     def _add_to_queue(self, sqname, sequence, length, passed_det=False):
+        """
+
+        :param sqname:
+        :param sequence:
+        :param length:
+        :param passed_det:
+        :return:
+        """
         if sqname == None or len == None:
             KittyException("add to queue error")
         q = QueueNode()
