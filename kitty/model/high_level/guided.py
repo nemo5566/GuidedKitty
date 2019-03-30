@@ -49,14 +49,13 @@ class GuidedModel(BaseModel):
         self._current_node = None
         self._queue = QueueEntry()
         self._det_num_mutations = 0
+        global INDIR, OUTDIR
 
     def _get_ready(self):
         if not self._ready:
             if self.indir and self.outdir:
                 KittyException("indir or outdir is None")
-            global INDIR
             INDIR = self.indir
-            global OUTDIR
             OUTDIR = self.outdir
             self.check_loops_in_guided()
             num = 0
