@@ -25,9 +25,9 @@ SPLICE_CYCLES = 15
 
 
 class GuidedModel(BaseModel):
-    '''
+    """
 
-    '''
+    """
 
     def __init__(self, name="GuidedModel", indir=None, outdir=None, skip_det=False):
         """
