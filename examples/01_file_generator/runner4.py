@@ -22,7 +22,7 @@ t4 = Template(name='T4', fields=[
     String('The dgfdsgfdsring', name='S1_1'),
     String('Anfgdsgfdsring', name='S1_2'),
 ])
-model = GuidedModel(indir = "./indir/", outdir = "./outdir/")
+model = GuidedModel(indir = "indir", outdir = "outdir")
 model.connect(t1)
 model.connect(t1, t2)
 model.connect(t2, t4)

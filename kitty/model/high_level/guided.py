@@ -49,13 +49,14 @@ class GuidedModel(BaseModel):
         self._current_node = None
         self._queue = QueueEntry()
         self._det_num_mutations = 0
-        global INDIR, OUTDIR
 
     def _get_ready(self):
         if not self._ready:
             if self.indir and self.outdir:
                 KittyException("indir or outdir is None")
+            global INDIR
             INDIR = self.indir
+            global OUTDIR
             OUTDIR = self.outdir
             self.check_loops_in_guided()
             num = 0
@@ -88,7 +89,9 @@ class GuidedModel(BaseModel):
                 sqlen += sqrender.len
                 sqbit.append(sqrender)
             sqname = "root" + sqname
-            sqfilename = os.path.join(INDIR, sqname)
+            cwd = os.getcwd()
+            cwdin = os.path.join(cwd, INDIR)
+            sqfilename = os.path.join(cwdin, sqname)
             f = open(sqfilename, "wb")
             sqbit.tofile(f)
             f.close()
@@ -238,8 +241,8 @@ class QueueEntry(KittyObject):
         self._new_hit_cnt = 0
         self._havoc_num = 0
         self._stop_soon = False
-        global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC, HAVOC_BLK_LARGE, HAVOC_BLK_SMALL, HAVOC_BLK_MEDIUM, \
-            HAVOC_BLK_XL, HAVOC_MAX_MULT, SPLICE_CYCLES
+        # global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC, HAVOC_BLK_LARGE, HAVOC_BLK_SMALL, HAVOC_BLK_MEDIUM, \
+        #     HAVOC_BLK_XL, HAVOC_MAX_MULT, SPLICE_CYCLES
 
     def _add_to_queue(self, sqname, sequence, length, passed_det=False):
         """
