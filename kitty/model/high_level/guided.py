@@ -13,6 +13,7 @@ import math
 
 INDIR = None
 OUTDIR = None
+QUEUEPATH = None
 HAVOC_CYCLES_INIT = 1024
 HAVOC_CYCLES = 256
 SPLICE_HAVOC = 32
@@ -92,10 +93,11 @@ class GuidedModel(BaseModel):
             cwd = os.getcwd()
             cwdin = os.path.join(cwd, INDIR)
             sqfilename = os.path.join(cwdin, sqname)
-            f = open(sqfilename, "wb")
-            sqbit.tofile(f)
+            with open(sqfilename, "wb") as f:
+                sqbit.tofile(f)
             f.close()
             self._queue._add_to_queue(sqfilename, sq, sqlen)
+            self._queue._queue_cur = self._queue._queue
 
     def _load_extras(self):
         # TODO: need to load the extras in fields
@@ -286,17 +288,18 @@ class QueueEntry(KittyObject):
     def _pivot_inputs(self):
         pivot_id = 0
         q = self._queue
-        global OUTDIR
-        queue_path = os.path.join(OUTDIR, "queue")
+        queue_path = os.path.join(OUTDIR, "queue%s" % time.strftime("%Y%m%d-%H%M%S"))
+        global QUEUEPATH
+        QUEUEPATH = queue_path
         os.mkdir(queue_path)
         while q:
             fname = os.path.split(q.fname)[-1]
-            qname = "id:%06u,orig:%s" % (id, fname)
+            qname = "id:%06u,orig:%s" % (pivot_id, fname)
             nfn = os.path.join(queue_path, qname)
             os.link(q.fname, nfn)
             q.fname = nfn
 
-            if q.pass_det:
+            if q.passed_det:
                 self._mark_as_det_done(q)
 
             q = q.next
@@ -567,15 +570,11 @@ class QueueEntry(KittyObject):
                         self._splicing_with += 1
                     if target:
                         break
-                    tf = open(target.fname, "rb")
-                    if tf < 0:
-                        KittyException("queue file open error")
-                    tbuff = tf.read()
+                    with open(target.fname, "rb") as tf:
+                        tbuff = tf.read()
                     tf.close()
-                    qf = open(self._queue_cur.fname, "rb")
-                    if qf < 0:
-                        KittyException("queue file open error")
-                    qbuff = qf.read()
+                    with open(self._queue_cur.fname, "rb") as qf:
+                        qbuff = qf.read()
                     qf.close()
                     minlen = min(len(tbuff), len(qbuff))
                     for i in range(0, minlen):
