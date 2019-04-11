@@ -589,7 +589,7 @@ class QueueEntry(KittyObject):
         tlen = target.len
         newbuff = tbuff[0: split_at]  # type: str
         newbuff += qbuff[split_at: tlen]
-        self._update_queue_cur(newbuff)
+        self._update_queue_cur(target, newbuff)
         return 0
 
     def _abandon_entry(self):
@@ -601,7 +601,8 @@ class QueueEntry(KittyObject):
                 self.pending_favored -= 1
         return
 
-    def _update_queue_cur(self, newbuff):
+    def _update_queue_cur(self, target, newbuff):
+
         pass
 
     def _calculate_score(self):
