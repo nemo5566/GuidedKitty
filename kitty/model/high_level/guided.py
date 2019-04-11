@@ -611,6 +611,9 @@ class QueueEntry(KittyObject):
     def save_if_interesting(self):
         pass
 
+    def write_to_testcase(self):
+        pass
+
     @property
     def queue_cur(self):
         return self._queue_cur
