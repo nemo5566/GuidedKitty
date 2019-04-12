@@ -30,6 +30,21 @@ class GuidedTarget(ServerTarget):
     def _receive_from_target(self):
         return ''
 
+    def _check_bits(self, bits):
+        if bits != 32 and bits != 64:
+            raise Exception("Wrong bitness: %d" % bits)
+
+    def _magic_for_bits(self, bits):
+        self._check_bits(bits)
+        if sys.byteorder == 'little':
+            return [kMagic64SecondHalf if bits == 64 else kMagic32SecondHalf, kMagicFirstHalf]
+        else:
+            return [kMagicFirstHalf, kMagic64SecondHalf if bits == 64 else kMagic32SecondHalf]
+
+    def _type_code_for_struct(self, bits):
+        self._check_bits(bits)
+        return 'Q' if bits == 64 else 'I'
+
     def _read_magic_return_bitness(self, f, path):
         magic_bytes = f.read(8)
         magic_words = struct.unpack('II', magic_bytes);
