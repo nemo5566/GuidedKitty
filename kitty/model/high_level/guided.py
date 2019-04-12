@@ -72,7 +72,6 @@ class GuidedModel(BaseModel):
             self._queue._pivot_inputs()
             self._load_extras()
 
-            # TODO: maybe perform_dry_run here?
 
             self._queue._cull_queue()
 
@@ -306,7 +305,7 @@ class QueueEntry(KittyObject):
             pivot_id += 1
 
     def _cull_queue(self):
-        # TODO:need to implement after sancov finishing
+
         pass
 
     def _save_if_interesting(self):
@@ -376,7 +375,6 @@ class QueueEntry(KittyObject):
             use_stacking = int(math.pow(2, random.randint(1, 8)))
             for i in range(use_stacking):
                 k = random.randint(1, 15 + (2 if self._extras_cnt + self._a_extras_cnt else 0))
-                # TODO:implement the havoc cases
                 if k == 1:
                     ranstart = random.randint(0, temp_len - 1)
                     node_val.invert(range(ranstart, ranstart + 1))
