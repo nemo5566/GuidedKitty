@@ -565,17 +565,21 @@ class QueueEntry(KittyObject):
                     while tid > 0:
                         target = target.next
                         tid -= 1
-                    while target.len < 16 or target == self._queue_cur:
+                    while target.sequence[-1].dst.render().len < 16 or target == self._queue_cur:
                         target = target.next
                         self._splicing_with += 1
                     if target:
                         break
-                    with open(target.fname, "rb") as tf:
-                        tbuff = tf.read()
-                    tf.close()
-                    with open(self._queue_cur.fname, "rb") as qf:
-                        qbuff = qf.read()
-                    qf.close()
+                    # with open(target.fname, "rb") as tf:
+                    #     tbuff = tf.read()
+                    # tf.close()
+                    # with open(self._queue_cur.fname, "rb") as qf:
+                    #     qbuff = qf.read()
+                    # qf.close()
+                    tnode = target.sequence[-1].dst
+                    tbuff = BitArray(tnode.render()).copy()
+                    qnode = self._queue_cur.sequence[-1].dst
+                    qbuff = BitArray(qnode.render()).copy()
                     minlen = min(len(tbuff), len(qbuff))
                     for i in range(0, minlen):
                         if qbuff[i] != tbuff[i]:
@@ -589,7 +593,7 @@ class QueueEntry(KittyObject):
         tlen = target.len
         newbuff = tbuff[0: split_at]  # type: str
         newbuff += qbuff[split_at: tlen]
-        self._update_queue_cur(target, newbuff)
+        qnode.set_current_value(newbuff)
         return 0
 
     def _abandon_entry(self):
