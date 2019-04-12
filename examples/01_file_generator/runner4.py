@@ -28,4 +28,5 @@ model.connect(t1, t2)
 model.connect(t2, t4)
 model.connect(t1, t3)
 model.connect(t3, t4)
-model.get_sequence()
+seq = model.get_sequence()
+print seq
