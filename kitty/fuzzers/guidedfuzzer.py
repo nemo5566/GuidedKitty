@@ -1,4 +1,4 @@
-#TODO: maybe implement the perform_dry_run(use_argv); in _test_environment
+
 """
 
 """
@@ -37,11 +37,24 @@ class GuidedFuzzer(BaseFuzzer):
     def _test_environment(self):
         sequence = self.model.get_sequence()
         try:
-            if self._run_sequence(sequence):
+            if self._perform_dry_run(sequence):
                 raise Exception('Environment test failed')
         except:
             self.logger.info('Environment test failed')
             raise
+
+    def _perform_dry_run(self, sequence):
+        queue_entry = self.model.get_queue()
+        cal_failures = 0
+        q = queue_entry._queue
+        while q:
+
+
+
+            q = q.next
+
+    def _pre_test(self):
+        pass
 
     def _run_sequence(self, sequence):
         '''

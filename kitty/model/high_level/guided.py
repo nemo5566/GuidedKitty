@@ -127,6 +127,11 @@ class GuidedModel(BaseModel):
         assert self._queue.queue_cur.sequence
         return self._queue.queue_cur.sequence[:]
 
+    def get_queue(self):
+        self._get_ready()
+        assert self._queue
+        return self._queue
+
     def hash(self):
         hashed = super(GuidedModel, self).hash()
         skeys = sorted(self._graph.keys())

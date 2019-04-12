@@ -1,4 +1,4 @@
-# TODO:implement the perform_dry_run(use_argv); function in setup
+
 """
 
 """
@@ -10,6 +10,8 @@ import sys
 kMagic32SecondHalf = 0xFFFFFF32
 kMagic64SecondHalf = 0xFFFFFF64
 kMagicFirstHalf = 0xC0BFFFFF
+
+MAP_SIZE = 65536
 
 class GuidedTarget(ServerTarget):
     '''
@@ -29,6 +31,12 @@ class GuidedTarget(ServerTarget):
 
     def _receive_from_target(self):
         return ''
+
+    def post_test(self, test_num):
+        pass
+
+    def pre_test(self, test_num):
+        pass
 
     def _check_bits(self, bits):
         if bits != 32 and bits != 64:
@@ -73,3 +81,16 @@ class GuidedTarget(ServerTarget):
         f.close()
         # self.logger.debug("sancov: read %d %d-bit PCs from %s" % (size * 8 / bits, bits, path))
         return s
+
+    def get_bit_map(self, file):
+        new_edge = 0
+        cov_total = 0
+        s = self._parse_one_file(file)
+        trace_bits = [0] * MAP_SIZE
+        prev_loc = 0
+        for cur_loc in s:
+            cur_loc = (cur_loc >> 4) ^ (cur_loc << 8)
+            cur_loc &= MAP_SIZE - 1
+            trace_bits[prev_loc ^ cur_loc] += 1
+            prev_loc = cur_loc >> 1
+        return trace_bits
