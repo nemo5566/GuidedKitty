@@ -51,6 +51,7 @@ class GuidedFuzzer(BaseFuzzer):
 
 
 
+
             q = q.next
 
     def _pre_test(self):
