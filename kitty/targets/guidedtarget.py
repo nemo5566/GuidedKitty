@@ -94,3 +94,6 @@ class GuidedTarget(ServerTarget):
             trace_bits[prev_loc ^ cur_loc] += 1
             prev_loc = cur_loc >> 1
         return trace_bits
+
+    def transmit(self, payload):
+        pass
