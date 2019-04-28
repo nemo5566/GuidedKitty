@@ -8,6 +8,8 @@ from kitty.fuzzers.base import BaseFuzzer
 from kitty.data.report import Report
 
 CAL_CYCLES = 8
+TOTAL_CAL_US = 0
+TOTAL_CAL_CYCLES = 0
 
 
 class GuidedFuzzer(BaseFuzzer):
@@ -52,7 +54,7 @@ class GuidedFuzzer(BaseFuzzer):
         cal_failures = 0
         q = queue_entry._queue
         while q:
-            res = self.calibrate_case(q)
+            res = self.calibrate_case(q, queue_entry)
 
 
 
@@ -61,13 +63,14 @@ class GuidedFuzzer(BaseFuzzer):
     def _pre_test(self):
         pass
 
-    def calibrate_case(self, queue):
+    def calibrate_case(self, queue, queue_entry):
         """
         Calibrate a new test case. This is done when processing the input directory
         to warn about flaky or otherwise problematic test cases early on; and when
         new paths are discovered to detect variable behavior and so on.
         :return:
         """
+        global TOTAL_CAL_US, TOTAL_CAL_CYCLES
         stage_max = 3 if self.fast_cal else CAL_CYCLES
         self._test_info()
         session_data = self.target.get_session_data()
@@ -76,6 +79,14 @@ class GuidedFuzzer(BaseFuzzer):
         for i in range(0, stage_max):
             cksum = 0
             res = self._run_sequence(sequence)
+        stop_us = int(time.time() * 1000)
+        TOTAL_CAL_US += start_us - stop_us
+        TOTAL_CAL_CYCLES += stage_max
+        queue.exec_us = (start_us - stop_us)/stage_max
+        # queue.bitmap_size =
+        # queue.handicap =
+        queue.cal_failed = 0
+        queue_entry.update_bitmap_score(queue)
 
 
     def _run_sequence(self, sequence):
