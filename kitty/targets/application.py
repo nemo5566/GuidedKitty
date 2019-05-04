@@ -19,10 +19,10 @@ import os
 import time
 import select
 from subprocess import Popen, PIPE
-from kitty.targets.server import ServerTarget
+from kitty.targets.guidedtarget import GuidedTarget
 
 
-class ApplicationTarget(ServerTarget):
+class ApplicationTarget(GuidedTarget):
     '''
     ApplicationTarget will run an application for each fuzzed payloads
     '''

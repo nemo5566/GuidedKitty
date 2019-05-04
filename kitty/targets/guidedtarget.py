@@ -23,7 +23,7 @@ class GuidedTarget(BaseTarget):
     Target that does nothing. Weird, but sometimes it is required.
     '''
 
-    def __init__(self, name, logger=None, expect_response=False):
+    def __init__(self, name, logger=None, expect_response=False, tfile=None):
         '''
         :param name: name of the target
         :param logger: logger for this object (default: None)
@@ -35,6 +35,7 @@ class GuidedTarget(BaseTarget):
         self.receive_failure = False
         self.transmission_count = 0
         self.transmission_report = None
+        self.tfile = tfile
 
 
     def _check_bits(self, bits):
@@ -112,7 +113,7 @@ class GuidedTarget(BaseTarget):
 
         :param test_num: the test number
         '''
-        super(ServerTarget, self).pre_test(test_num)
+        super(GuidedTarget, self).pre_test(test_num)
         self.send_failure = False
         self.receive_failure = False
         self.transmission_count = 0
@@ -126,7 +127,7 @@ class GuidedTarget(BaseTarget):
         :type payload: str
         :param payload: payload to send
         :rtype: str
-        :return: the response (if received)
+        :return: the response (if received) and trace_bits
         '''
         response = None
         trans_report_name = 'transmission_0x%04x' % self.transmission_count
@@ -170,6 +171,7 @@ class GuidedTarget(BaseTarget):
             self.logger.error(traceback.format_exc())
             self.send_failure = True
         self.transmission_count += 1
+        trace_bits = self.get_bit_map(self.tfile)
         return response
 
     def post_test(self, test_num):
@@ -178,7 +180,7 @@ class GuidedTarget(BaseTarget):
 
         :param test_num: the test number
         '''
-        super(ServerTarget, self).post_test(test_num)
+        super(GuidedTarget, self).post_test(test_num)
         if self.send_failure:
             self.report.failed('send failure')
         elif self.expect_response and self.receive_failure:
