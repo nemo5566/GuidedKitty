@@ -655,6 +655,8 @@ class QueueEntry(KittyObject):
             min_value = 1
         return min_value + random.randint(min(max_value, limit) - min_value + 1)
 
-    def update_bitmap_score(self):
+    def update_bitmap_score(self, queue, trace_bits):
         pass
 
+    def get_bitmap_size(self, trace_bits):
+        pass

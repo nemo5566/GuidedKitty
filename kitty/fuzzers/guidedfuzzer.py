@@ -8,8 +8,10 @@ from kitty.fuzzers.base import BaseFuzzer
 from kitty.data.report import Report
 
 CAL_CYCLES = 8
+CAL_CYCLES_LONG = 40
 TOTAL_CAL_US = 0
 TOTAL_CAL_CYCLES = 0
+MAP_SIZE = 65536
 
 
 class GuidedFuzzer(BaseFuzzer):
@@ -71,22 +73,37 @@ class GuidedFuzzer(BaseFuzzer):
         :return:
         """
         global TOTAL_CAL_US, TOTAL_CAL_CYCLES
+        first_trace = [0]*MAP_SIZE
+        var_bytes = [0]*MAP_SIZE
+        # TODO: var_bytes should be set global
         stage_max = 3 if self.fast_cal else CAL_CYCLES
         self._test_info()
         session_data = self.target.get_session_data()
         sequence = queue.sequence
         start_us = int(time.time() * 1000)
-        for i in range(0, stage_max):
-            cksum = 0
-            res = self._run_sequence(sequence)
+        j = 0
+        while j < stage_max:
+            run_res, trace_bits, pos_res = self._run_sequence(sequence)
+            cksum = hash(str(trace_bits))
+            if queue.exec_cksum != cksum:
+                if queue.exec_cksum:
+                    i = 0
+                    while i < MAP_SIZE:
+                        if not var_bytes[i] and first_trace[i] != trace_bits[i]:
+                            var_bytes[i] = 1
+                            stage_max = CAL_CYCLES_LONG
+                else:
+                    queue.exec_cksum = cksum
+                    first_trace = trace_bits
+            j += 1
         stop_us = int(time.time() * 1000)
         TOTAL_CAL_US += start_us - stop_us
         TOTAL_CAL_CYCLES += stage_max
         queue.exec_us = (start_us - stop_us)/stage_max
-        # queue.bitmap_size =
+        queue.bitmap_size = queue_entry.get_bitmap_size(trace_bits)
         # queue.handicap =
         queue.cal_failed = 0
-        queue_entry.update_bitmap_score(queue)
+        queue_entry.update_bitmap_score(queue, trace_bits)
 
 
     def _run_sequence(self, sequence):
@@ -95,6 +112,7 @@ class GuidedFuzzer(BaseFuzzer):
         '''
         self._check_pause()
         self._pre_test()
+        trace_bits = [0] * MAP_SIZE
         session_data = self.target.get_session_data()
         self._test_info()
         resp = None
@@ -104,8 +122,16 @@ class GuidedFuzzer(BaseFuzzer):
             session_data = self.target.get_session_data()
             node = edge.dst
             node.set_session_data(session_data)
-            resp = self._transmit(node)
-        return self._post_test()
+            resp, tb = self._transmit(node)
+            i = 0
+            trace_bits_hash = hash(str(trace_bits))
+            if not trace_bits_hash == hash(str(tb)):
+                while i < MAP_SIZE:
+                    if trace_bits[i] or tb[i]:
+                        trace_bits[i] = trace_bits[i] | tb[i]
+                    i += 1
+        post_res = self._post_test()
+        return resp, trace_bits, post_res
 
     def _transmit(self, node):
         '''

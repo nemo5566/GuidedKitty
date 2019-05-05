@@ -28,7 +28,7 @@ class ApplicationTarget(GuidedTarget):
     ApplicationTarget will run an application for each fuzzed payloads
     '''
 
-    def __init__(self, name, path, args, env=None, tempfile=None, timeout=2, logger=None):
+    def __init__(self, name, path, args, targetfile=None, env=None, tempfile=None, timeout=2, logger=None):
         '''
         :param name: name of the object
         :param path: path to the target executable
@@ -53,7 +53,7 @@ class ApplicationTarget(GuidedTarget):
             Will run ``/tmp/myApp -a -b -c /tmp/tempdata.bin`` for evey mutation with timout of 1.5 seconds
 
         '''
-        super(ApplicationTarget, self).__init__(name, logger)
+        super(ApplicationTarget, self).__init__(name, logger, tfile=targetfile)
         self.path = path
         self.args = args
         self.env = env
