@@ -16,9 +16,10 @@
 # along with Katnip.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-import time
 import select
+import time
 from subprocess import Popen, PIPE
+
 from kitty.targets.guidedtarget import GuidedTarget
 
 

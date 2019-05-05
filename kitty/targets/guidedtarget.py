@@ -3,14 +3,14 @@
 
 """
 
-from kitty.targets.server import ServerTarget
 import struct
 import sys
 import time
 import traceback
 from binascii import hexlify
-from kitty.targets.base import BaseTarget
+
 from kitty.data.report import Report
+from kitty.targets.base import BaseTarget
 
 kMagic32SecondHalf = 0xFFFFFF32
 kMagic64SecondHalf = 0xFFFFFF64
@@ -172,7 +172,7 @@ class GuidedTarget(BaseTarget):
             self.send_failure = True
         self.transmission_count += 1
         trace_bits = self.get_bit_map(self.tfile)
-        return response
+        return response, trace_bits
 
     def post_test(self, test_num):
         '''
