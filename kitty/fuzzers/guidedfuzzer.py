@@ -7,7 +7,7 @@ import traceback
 from kitty.fuzzers.base import BaseFuzzer
 from kitty.data.report import Report
 
-CAL_CYCLES = 8
+CAL_CYCLES = 4
 CAL_CYCLES_LONG = 40
 TOTAL_CAL_US = 0
 TOTAL_CAL_CYCLES = 0
@@ -57,9 +57,6 @@ class GuidedFuzzer(BaseFuzzer):
         q = queue_entry._queue
         while q:
             res = self.calibrate_case(q, queue_entry)
-
-
-
             q = q.next
 
     def _pre_test(self):
@@ -75,8 +72,9 @@ class GuidedFuzzer(BaseFuzzer):
         global TOTAL_CAL_US, TOTAL_CAL_CYCLES
         first_trace = [0]*MAP_SIZE
         var_bytes = [0]*MAP_SIZE
+        new_bits = 0
         # TODO: var_bytes should be set global
-        stage_max = 3 if self.fast_cal else CAL_CYCLES
+        stage_max = 2 if self.fast_cal else CAL_CYCLES
         self._test_info()
         session_data = self.target.get_session_data()
         sequence = queue.sequence
@@ -86,16 +84,20 @@ class GuidedFuzzer(BaseFuzzer):
             run_res, trace_bits, pos_res = self._run_sequence(sequence)
             cksum = hash(str(trace_bits))
             if queue.exec_cksum != cksum:
-                if queue.exec_cksum:
-                    i = 0
-                    while i < MAP_SIZE:
-                        if not var_bytes[i] and first_trace[i] != trace_bits[i]:
-                            var_bytes[i] = 1
-                            stage_max = CAL_CYCLES_LONG
-                        i += 1
-                else:
-                    queue.exec_cksum = cksum
-                    first_trace = trace_bits
+                hnb = queue_entry.has_new_bits(trace_bits)
+                if hnb > new_bits:
+                    new_bits = hnb
+            #     if queue.exec_cksum:
+            #         i = 0
+            #         while i < MAP_SIZE:
+            #             if not var_bytes[i] and first_trace[i] != trace_bits[i]:
+            #                 var_bytes[i] = 1
+            #                 stage_max = CAL_CYCLES_LONG
+            #                 print "Change to CAL_LONG"
+            #             i += 1
+            #     else:
+            #         queue.exec_cksum = cksum
+            #         first_trace = trace_bits
             j += 1
         stop_us = int(time.time() * 1000)
         TOTAL_CAL_US += start_us - stop_us
@@ -105,7 +107,10 @@ class GuidedFuzzer(BaseFuzzer):
         # queue.handicap =
         queue.cal_failed = 0
         queue_entry.update_bitmap_score(queue, trace_bits)
-
+        if new_bits == 2 and queue.has_new_cov == 0:
+            queue.has_new_cov = 1
+            queue_entry.queued_with_cov += 1
+        return
 
     def _run_sequence(self, sequence):
         '''
