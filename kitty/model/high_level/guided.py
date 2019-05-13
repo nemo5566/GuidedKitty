@@ -23,7 +23,7 @@ HAVOC_BLK_LARGE = 1500
 HAVOC_BLK_XL = 32768
 HAVOC_MAX_MULT = 16
 SPLICE_CYCLES = 15
-
+MAP_SIZE = 65536
 
 class GuidedModel(BaseModel):
     """
@@ -189,7 +189,7 @@ class QueueNode(KittyObject):
         self.cal_failed = False
         self.was_fuzzed = False
         self.passed_det = False
-        self.has_new_con = False
+        self.has_new_cov = 0
         self.var_behavior = None
         self.favored = False
 
@@ -247,6 +247,11 @@ class QueueEntry(KittyObject):
         self._new_hit_cnt = 0
         self._havoc_num = 0
         self._stop_soon = False
+        self._top_rated = [None] * MAP_SIZE
+        self._score_changed = 0
+        self._virgin_bits = [-1]*MAP_SIZE
+        self._bitmap_changed = 0
+        self.queued_with_cov = 0
         # global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC, HAVOC_BLK_LARGE, HAVOC_BLK_SMALL, HAVOC_BLK_MEDIUM, \
         #     HAVOC_BLK_XL, HAVOC_MAX_MULT, SPLICE_CYCLES
 
@@ -656,7 +661,54 @@ class QueueEntry(KittyObject):
         return min_value + random.randint(min(max_value, limit) - min_value + 1)
 
     def update_bitmap_score(self, queue, trace_bits):
-        pass
+        i = 0
+        fav_factor = queue.exec_us * queue.len
+        while i < MAP_SIZE:
+            if trace_bits[i]:
+                if self._top_rated[i]:
+                    if fav_factor > self._top_rated[i].exec_us * self._top_rated[i].len:
+                        continue
+                    if self._top_rated[i].tc_ref > 0:
+                        self._top_rated[i].tc_ref -= 1
+                        self._top_rated[i].trace_mini = None
+                self._top_rated[i] = queue
+                queue.tc_ref += 1
+                if not queue.trace_mini:
+                    queue.trace_mini = self._minimize_bits(trace_bits)
+                self._score_changed = 1
+            i += 1
+        return
 
     def get_bitmap_size(self, trace_bits):
-        pass
+        i = 0
+        size = 0
+        while i < MAP_SIZE:
+            size += trace_bits[i]
+            i += 1
+        return size
+
+    def _minimize_bits(self, trace_bits):
+        i = 0
+        mini_bits = [0] * MAP_SIZE
+        while i < MAP_SIZE:
+            if trace_bits[i]:
+                mini_bits[i] = 1
+            i += 1
+        return mini_bits
+
+    def has_new_bits(self, trace_bits):
+        i = 0
+        ret = 0
+        while i < MAP_SIZE:
+            if trace_bits[i]:
+                if self._virgin_bits[i] == -1:
+                    ret = 2
+                    self._virgin_bits[i] = trace_bits[i]
+                    self._bitmap_changed = 1
+                elif self._virgin_bits != trace_bits[i]:
+                    if ret != 2:
+                        ret = 1
+                    self._virgin_bits[i] = trace_bits[i]
+                    self._bitmap_changed = 1
+            i += 1
+        return ret
