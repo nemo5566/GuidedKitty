@@ -667,6 +667,7 @@ class QueueEntry(KittyObject):
             if trace_bits[i]:
                 if self._top_rated[i]:
                     if fav_factor > self._top_rated[i].exec_us * self._top_rated[i].len:
+                        i += 1
                         continue
                     if self._top_rated[i].tc_ref > 0:
                         self._top_rated[i].tc_ref -= 1
