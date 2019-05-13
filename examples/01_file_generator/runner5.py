@@ -4,6 +4,7 @@ from kitty.interfaces import WebInterface
 from kitty.model import String
 from kitty.model import Template
 from kitty.model import GuidedModel
+import time
 t1 = Template(name='T1', fields=[
     String('The def\nault string\n', name='S1_1'),
     String('Another string', name='S1_2'),
@@ -32,4 +33,6 @@ fuzzer = GuidedFuzzer(name="Example 1 - File Generator")
 fuzzer.set_interface(WebInterface(port=26004))
 fuzzer.set_model(model)
 fuzzer.set_target(at)
+print time.strftime("%Y%m%d-%H%M%S")
 fuzzer._test_environment()
+print time.strftime("%Y%m%d-%H%M%S")

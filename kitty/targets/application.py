@@ -113,6 +113,7 @@ class ApplicationTarget(GuidedTarget):
         else:  # pipe mode
             self._process = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=self.env)
             self._process.stdin.write(data)
+        #self._read(self._process.stdout)
         self.report.add('path', self.path)
         self.report.add('args', str(self.args))
         self.report.add('process_id', self._process.pid)

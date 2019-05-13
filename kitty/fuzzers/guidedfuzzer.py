@@ -92,6 +92,7 @@ class GuidedFuzzer(BaseFuzzer):
                         if not var_bytes[i] and first_trace[i] != trace_bits[i]:
                             var_bytes[i] = 1
                             stage_max = CAL_CYCLES_LONG
+                        i += 1
                 else:
                     queue.exec_cksum = cksum
                     first_trace = trace_bits

@@ -39,6 +39,7 @@ class GuidedTarget(BaseTarget):
         self.transmission_count = 0
         self.transmission_report = None
         self.sancov_path = sancov_path
+        self.first_run = True
 
 
     def _check_bits(self, bits):
@@ -147,7 +148,7 @@ class GuidedTarget(BaseTarget):
                 if i.endswith(".sancov"):
                     sancov_name = i
         if sancov_raw_name is None and sancov_name is None:
-            assert("[Error]Can't find sancov file!!!!")
+            assert sancov_raw_name and sancov_name, "[Error]Can't find sancov file!!!!"
         if sancov_raw_name is not None:
             sancov_raw_path = os.path.join(self.sancov_path, sancov_raw_name)
             sancov_map_path = sancov_raw_path[: -3] + "map"
@@ -248,6 +249,9 @@ class GuidedTarget(BaseTarget):
             self.logger.error(traceback.format_exc())
             self.send_failure = True
         self.transmission_count += 1
+        if self.first_run:
+            time.sleep(0.5)
+            self.first_run = False
         sancov_file = self.get_cov_file()
         trace_bits = self.get_bit_map(sancov_file)
         return response, trace_bits
