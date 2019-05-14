@@ -71,10 +71,6 @@ class GuidedModel(BaseModel):
             self._init_queue()
             self._queue._pivot_inputs()
             self._load_extras()
-
-
-            self._queue._cull_queue()
-
             self._ready = True
             # self._update_state(0)
 
@@ -216,7 +212,7 @@ class QueueEntry(KittyObject):
         :param name:
         """
         super(QueueEntry, self).__init__(name)
-        self.pending_favored = 0
+        self._pending_favored = 0
         self._splicing_with = -1
         self._extras_cnt = 0
         self._a_extras_cnt = 0
@@ -252,6 +248,8 @@ class QueueEntry(KittyObject):
         self._virgin_bits = [-1]*MAP_SIZE
         self._bitmap_changed = 0
         self.queued_with_cov = 0
+        self._queued_favored = 0
+        self._dumb_mode = False
         # global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC, HAVOC_BLK_LARGE, HAVOC_BLK_SMALL, HAVOC_BLK_MEDIUM, \
         #     HAVOC_BLK_XL, HAVOC_MAX_MULT, SPLICE_CYCLES
 
@@ -315,8 +313,33 @@ class QueueEntry(KittyObject):
             pivot_id += 1
 
     def _cull_queue(self):
-
-        pass
+        temp_v = [1]*MAP_SIZE
+        if self._dumb_mode or not self._score_changed:
+            return
+        self._score_changed = 0
+        self._queued_favored = 0
+        self._pending_favored = 0
+        q = self._queue
+        while q:
+            q.favored = 0
+            q = q.next
+        i = 0
+        while i < MAP_SIZE:
+            if self._top_rated[i] and temp_v[i]:
+                j = MAP_SIZE
+                while j > 0:
+                    if self._top_rated[i].trace_mini[j]:
+                        temp_v[j] = 0
+                    j -= 1
+                self._top_rated[i].favored = 1
+                self._queued_favored += 1
+                if not self._top_rated[i].was_fuzzed:
+                    self._pending_favored += 1
+                i += 1
+        q = self._queue
+        while q:
+            self._mark_as_redundant(q, q.favored)
+            q = q.next
 
     def _save_if_interesting(self):
         pass
@@ -326,8 +349,9 @@ class QueueEntry(KittyObject):
 
     def _mutate(self):
 
+        self._cull_queue()
+
         if self._queue_cur_change:
-            self._cull_queue()
             self._calculate_score()
             self._queue_cur_change = False
 
@@ -713,3 +737,6 @@ class QueueEntry(KittyObject):
                     self._bitmap_changed = 1
             i += 1
         return ret
+
+    def _mark_as_redundant(self, q, favored):
+        pass
