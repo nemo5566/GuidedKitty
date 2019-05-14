@@ -102,7 +102,7 @@ class GuidedFuzzer(BaseFuzzer):
         stop_us = int(time.time() * 1000)
         TOTAL_CAL_US += start_us - stop_us
         TOTAL_CAL_CYCLES += stage_max
-        queue.exec_us = (start_us - stop_us)/stage_max
+        queue.exec_us = (stop_us - start_us)/stage_max
         queue.bitmap_size = queue_entry.get_bitmap_size(trace_bits)
         # queue.handicap =
         queue.cal_failed = 0
