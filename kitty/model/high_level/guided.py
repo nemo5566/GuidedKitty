@@ -69,7 +69,7 @@ class GuidedModel(BaseModel):
             assert len(self._sequences)
             self._reversquences = self._sequences[::-1]
             self._init_queue()
-            self._queue._pivot_inputs()
+            self._queue.pivot_inputs()
             self._load_extras()
             self._ready = True
             # self._update_state(0)
@@ -91,12 +91,22 @@ class GuidedModel(BaseModel):
             with open(sqfilename, "wb") as f:
                 sqbit.tofile(f)
             f.close()
-            self._queue._add_to_queue(sqfilename, sq, sqlen)
+            self._queue.add_to_queue(sqfilename, sq, sqlen)
             self._queue._queue_cur = self._queue._queue
 
     def _load_extras(self):
         # TODO: need to load the extras in fields
         pass
+
+    def get_test_info(self):
+        info = super(GuidedModel, self).get_test_info()
+        node_info = self._get_node().get_info()
+        info['node'] = node_info
+        info['sequence']['index'] = self._sequence_idx
+        return info
+
+    def _get_node(self):
+        return self._queue.queue_cur.sequence[-1].dst
 
     def _mutate(self):
 
@@ -107,7 +117,7 @@ class GuidedModel(BaseModel):
         :return: number of mutations in the model
         '''
         self._get_ready()
-        return self._det_num_mutations
+        return self._det_num_mutations + 100
 
     def _get_sequences(self, sequence=[]):
         sequences = []
@@ -253,7 +263,7 @@ class QueueEntry(KittyObject):
         # global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC, HAVOC_BLK_LARGE, HAVOC_BLK_SMALL, HAVOC_BLK_MEDIUM, \
         #     HAVOC_BLK_XL, HAVOC_MAX_MULT, SPLICE_CYCLES
 
-    def _add_to_queue(self, sqname, sequence, length, passed_det=False):
+    def add_to_queue(self, sqname, sequence, length, passed_det=False):
         """
 
         :param sqname:
@@ -292,7 +302,7 @@ class QueueEntry(KittyObject):
 
         self._last_path_time = int(time.time() * 1000)
 
-    def _pivot_inputs(self):
+    def pivot_inputs(self):
         pivot_id = 0
         q = self._queue
         queue_path = os.path.join(OUTDIR, "queue%s" % time.strftime("%Y%m%d-%H%M%S"))
@@ -348,10 +358,8 @@ class QueueEntry(KittyObject):
         pass
 
     def _mutate(self):
-
-        self._cull_queue()
-
         if self._queue_cur_change:
+            self._cull_queue()
             self._calculate_score()
             self._queue_cur_change = False
 
@@ -371,7 +379,7 @@ class QueueEntry(KittyObject):
             return
         else:
             node._det_finish = True
-            self._queue_cur.pass_det = True
+            self._queue_cur.passed_det = True
             node.reset()
 
     def _do_havoc_and_splicing(self):
@@ -404,10 +412,11 @@ class QueueEntry(KittyObject):
         node_val = BitArray(node.render()).copy()
         if self._havoc_max < 16:
             self._havoc_max = 16
-        temp_len = node_val.len
+
         if self._havoc_num < self._havoc_max:
             use_stacking = int(math.pow(2, random.randint(1, 8)))
             for i in range(use_stacking):
+                temp_len = node_val.len
                 k = random.randint(1, 15 + (2 if self._extras_cnt + self._a_extras_cnt else 0))
                 if k == 1:
                     ranstart = random.randint(0, temp_len - 1)
@@ -426,8 +435,9 @@ class QueueEntry(KittyObject):
                     # Randomly subtract from byte.
                     if temp_len < 8:
                         continue
-                    ranstart = random.randint(0, temp_len - 1)
+                    ranstart = random.randint(0, temp_len - 8)
                     tmp_uint = node_val[ranstart: ranstart + 8].uint - 1
+                    tmp_uint &= 0xff
                     tmp_b = BitArray(uint=tmp_uint, length=8)
                     del node_val[ranstart: ranstart + 8]
                     node_val.insert(tmp_b, ranstart)
@@ -435,8 +445,9 @@ class QueueEntry(KittyObject):
                 elif k == 6:
                     if temp_len < 8:
                         continue
-                    ranstart = random.randint(0, temp_len - 1)
+                    ranstart = random.randint(0, temp_len - 8)
                     tmp_uint = node_val[ranstart: ranstart + 8].uint + 1
+                    tmp_uint &= 0xff
                     tmp_b = BitArray(uint=tmp_uint, length=8)
                     del node_val[ranstart: ranstart + 8]
                     node_val.insert(tmp_b, ranstart)
@@ -444,15 +455,17 @@ class QueueEntry(KittyObject):
                 elif k == 7:
                     if temp_len < 16:
                         continue
-                    ranstart = random.randint(0, temp_len - 1)
+                    ranstart = random.randint(0, temp_len - 16)
                     if random.randint(0, 1):
                         tmp_uint = node_val[ranstart: ranstart + 16].uintbe - 1
+                        tmp_uint &= 0xffff
                         tmp_b = BitArray(uintbe=tmp_uint, length=16)
                         del node_val[ranstart: ranstart + 16]
                         node_val.insert(tmp_b, ranstart)
                         node.set_current_value(Bits(node_val))
                     else:
                         tmp_uint = node_val[ranstart: ranstart + 16].uintle - 1
+                        tmp_uint &= 0xffff
                         tmp_b = BitArray(uintle=tmp_uint, length=16)
                         del node_val[ranstart: ranstart + 16]
                         node_val.insert(tmp_b, ranstart)
@@ -460,31 +473,35 @@ class QueueEntry(KittyObject):
                 elif k == 8:
                     if temp_len < 16:
                         continue
-                    ranstart = random.randint(0, temp_len - 1)
+                    ranstart = random.randint(0, temp_len - 16)
                     if random.randint(0, 1):
                         tmp_uint = node_val[ranstart: ranstart + 16].uintbe + 1
+                        tmp_uint &= 0xffff
                         tmp_b = BitArray(uintbe=tmp_uint, length=16)
-                        del node_val[ranstart: ranstart + 16]
+                        del node_val[ranstart:  ranstart + 16]
                         node_val.insert(tmp_b, ranstart)
                         node.set_current_value(Bits(node_val))
                     else:
-                        tmp_uint = node_val[ranstart: ranstart + 16].uintle + 1
+                        tmp_uint = node_val[ranstart:  ranstart + 16].uintle + 1
+                        tmp_uint &= 0xffff
                         tmp_b = BitArray(uintle=tmp_uint, length=16)
-                        del node_val[ranstart: ranstart + 16]
+                        del node_val[ranstart:  ranstart + 16]
                         node_val.insert(tmp_b, ranstart)
                         node.set_current_value(Bits(node_val))
                 elif k == 9:
                     if temp_len < 32:
                         continue
-                    ranstart = random.randint(0, temp_len - 1)
+                    ranstart = random.randint(0, temp_len - 32)
                     if random.randint(0, 1):
-                        tmp_uint = node_val[ranstart: ranstart + 32].uintbe - 1
+                        tmp_uint = node_val[ranstart:  ranstart + 32].uintbe - 1
+                        tmp_uint &= 0xffffffff
                         tmp_b = BitArray(uintbe=tmp_uint, length=32)
                         del node_val[ranstart: ranstart + 32]
                         node_val.insert(tmp_b, ranstart)
                         node.set_current_value(Bits(node_val))
                     else:
                         tmp_uint = node_val[ranstart: ranstart + 32].uintle - 1
+                        tmp_uint &= 0xffffffff
                         tmp_b = BitArray(uintle=tmp_uint, length=32)
                         del node_val[ranstart: ranstart + 32]
                         node_val.insert(tmp_b, ranstart)
@@ -492,15 +509,17 @@ class QueueEntry(KittyObject):
                 elif k == 10:
                     if temp_len < 32:
                         continue
-                    ranstart = random.randint(0, temp_len - 1)
+                    ranstart = random.randint(0, temp_len - 32)
                     if random.randint(0, 1):
                         tmp_uint = node_val[ranstart: ranstart + 32].uintbe + 1
+                        tmp_uint &= 0xffffffff
                         tmp_b = BitArray(uintbe=tmp_uint, length=32)
                         del node_val[ranstart: ranstart + 32]
                         node_val.insert(tmp_b, ranstart)
                         node.set_current_value(Bits(node_val))
                     else:
                         tmp_uint = node_val[ranstart: ranstart + 32].uintle + 1
+                        tmp_uint &= 0xffffffff
                         tmp_b = BitArray(uintle=tmp_uint, length=32)
                         del node_val[ranstart: ranstart + 32]
                         node_val.insert(tmp_b, ranstart)
@@ -508,8 +527,8 @@ class QueueEntry(KittyObject):
                 elif k == 11:
                     if temp_len < 8:
                         continue
-                    ranstart = random.randint(0, temp_len - 1)
-                    node_val[ranstart: ranstart + 8] ^= Bits(int=random.randint(1, 255), length=8)
+                    ranstart = random.randint(0, temp_len - 8)
+                    node_val[ranstart: ranstart + 8] ^= Bits(uint=random.randint(1, 255), length=8)
                     node.set_current_value(Bits(node_val))
                 elif k == 12 or k == 13:
                     #  Delete bytes. We're making this a bit more likely
@@ -519,8 +538,8 @@ class QueueEntry(KittyObject):
                         continue
                     del_len = self._choose_block_len(temp_len / 8)
                     del_len *= 8
-                    ranstart = random.randint(0, temp_len - del_len + 1)
-                    del node_val[ranstart, ranstart + del_len]
+                    ranstart = random.randint(0, temp_len - del_len)
+                    del node_val[ranstart: ranstart + del_len - 1]
                     node.set_current_value(Bits(node_val))
                     temp_len -= del_len
                 elif k == 14:
@@ -532,8 +551,8 @@ class QueueEntry(KittyObject):
                     if actually_clone:
                         clone_len = self._choose_block_len(temp_len / 8)
                         clone_len *= 8
-                        clone_from = random.randint(0, temp_len - clone_len + 1)
-                        temp_clone = node_val[clone_from, clone_from + clone_len]
+                        clone_from = random.randint(0, temp_len - clone_len)
+                        temp_clone = node_val[clone_from: min(clone_from + clone_len - 1, temp_len - 1)]
                         node_val.insert(temp_clone, clone_to)
                     else:
                         clone_len = self._choose_block_len(HAVOC_BLK_XL)
@@ -554,15 +573,15 @@ class QueueEntry(KittyObject):
                     clone_len *= 8
                     clone_to = random.randint(0, temp_len - clone_len)
                     if actually_clone:
-                        clone_from = random.randint(0, temp_len - clone_len + 1)
-                        temp_clone = node_val[clone_from, clone_from + clone_len]
-                        del node_val[clone_to, clone_to + clone_len]
+                        clone_from = random.randint(0, temp_len - clone_len)
+                        temp_clone = node_val[clone_from: min(clone_from + clone_len - 1, temp_len - 1)]
+                        del node_val[clone_to: clone_to + clone_len]
                         node_val.insert(temp_clone, clone_to)
                     else:
                         temp_clone = BitArray()
                         for _ in range(0, clone_len / 8):
                             temp_clone += BitArray(uint=random.randint(1, 255), length=8)
-                        del node_val[clone_to, clone_to + clone_len]
+                        del node_val[clone_to: clone_to + clone_len]
                         node_val.insert(temp_clone, clone_to)
                     node.set_current_value(Bits(node_val))
 
@@ -630,8 +649,8 @@ class QueueEntry(KittyObject):
 
     def _abandon_entry(self):
         self._splicing_with = -1
-        if not self._stop_soon and not self._queue_cur.cal_failed and not self._queue_cur.was_fazzed:
-            self._queue_cur.was_fazzed = 1
+        if not self._stop_soon and not self._queue_cur.cal_failed and not self._queue_cur.was_fuzzed:
+            self._queue_cur.was_fuzzed = 1
             self._pending_not_fuzzed -= 1
             if self._queue_cur.favored:
                 self.pending_favored -= 1
@@ -682,7 +701,7 @@ class QueueEntry(KittyObject):
                 max_value = HAVOC_BLK_XL
         if min_value >= limit:
             min_value = 1
-        return min_value + random.randint(min(max_value, limit) - min_value + 1)
+        return min_value + random.randint(0, min(max_value, limit) - min_value)
 
     def update_bitmap_score(self, queue, trace_bits):
         i = 0

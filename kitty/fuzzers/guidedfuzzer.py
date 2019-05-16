@@ -6,6 +6,7 @@ import time
 import traceback
 from kitty.fuzzers.base import BaseFuzzer
 from kitty.data.report import Report
+from kitty.fuzzers.test_list import RangesList, StartEndList
 
 CAL_CYCLES = 4
 CAL_CYCLES_LONG = 40
@@ -30,6 +31,35 @@ class GuidedFuzzer(BaseFuzzer):
         '''
         super(GuidedFuzzer, self).__init__(name, logger, option_line)
         self.fast_cal = fast_cal
+
+
+    def _next_mutation(self):
+        '''
+        :return: True if mutated, False otherwise
+        '''
+        if self._keep_running():
+            current_idx = self.model.current_index()
+            self.session_info.current_index = current_idx
+            next_idx = self._test_list.current()
+            if next_idx is None:
+                return False
+            skip = next_idx - current_idx - 1
+            if skip > 0:
+                self.model.skip(skip)
+            self._test_list.next()
+            resp = self.model.mutate()
+            return resp
+        return False
+
+    def _keep_running(self):
+        '''
+        Should we still fuzz??
+        '''
+        if self.config.max_failures:
+            if self.session_info.failure_count >= self.config.max_failures:
+                return False
+        return self._test_list.current() is not None
+
 
     def _start(self):
         self.logger.info('should keep running? %s' % self._keep_running())
@@ -59,8 +89,7 @@ class GuidedFuzzer(BaseFuzzer):
             res = self.calibrate_case(q, queue_entry)
             q = q.next
 
-    def _pre_test(self):
-        pass
+
 
     def calibrate_case(self, queue, queue_entry):
         """
@@ -116,8 +145,10 @@ class GuidedFuzzer(BaseFuzzer):
         '''
         Run a single sequence
         '''
+        # self._test_list = StartEndList(0, self.model.num_mutations())
+        # self._load_session()
         self._check_pause()
-        self._pre_test()
+        # self._pre_test()
         trace_bits = [0] * MAP_SIZE
         session_data = self.target.get_session_data()
         self._test_info()
