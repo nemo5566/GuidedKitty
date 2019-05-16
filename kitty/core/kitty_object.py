@@ -40,7 +40,7 @@ class KittyObject(object):
         '''
         if KittyObject._logger is None:
             logger = logging.getLogger('kitty')
-            logger.setLevel(logging.INFO)
+            logger.setLevel(logging.DEBUG)
             consolehandler = logging.StreamHandler()
             console_format = logging.Formatter('[%(levelname)-8s][%(module)s.%(funcName)s] %(message)s')
             consolehandler.setFormatter(console_format)

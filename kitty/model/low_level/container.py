@@ -63,6 +63,7 @@ class Container(BaseField):
         self._containers = []
         self._ready = False
         self.replace_fields(fields)
+        self._det_finish = False
 
     # BaseField overriden API methods
     def copy(self):
@@ -106,30 +107,31 @@ class Container(BaseField):
         :return: rendered value of the container
         '''
         self._initialize()
-        render_count = 1
-        if ctx is None:
-            ctx = RenderContext()
-            if self._need_second_pass:
-                render_count = 2
-        ctx.push(self)
-        if self.is_default():
-            self._current_rendered = self._default_rendered
-        else:
-            if self.offset is None:
-                self.offset = 0
-            for i in range(render_count):
-                offset = self.offset
-                rendered = BitArray()
-                for field in self._fields:
-                    field.set_offset(offset)
-                    frendered = field.render(ctx)
-                    if not isinstance(frendered, Bits):
-                        raise KittyException('the field %s:%s was rendered to type %s, you should probably wrap it with appropriate encoder' % (
-                            field.get_name(), type(field), type(frendered)))
-                    rendered.append(frendered)
-                    offset += len(frendered)
-                self.set_current_value(rendered)
-        ctx.pop()
+        if not self._det_finish:
+            render_count = 1
+            if ctx is None:
+                ctx = RenderContext()
+                if self._need_second_pass:
+                    render_count = 2
+            ctx.push(self)
+            if self.is_default():
+                self._current_rendered = self._default_rendered
+            else:
+                if self.offset is None:
+                    self.offset = 0
+                for i in range(render_count):
+                    offset = self.offset
+                    rendered = BitArray()
+                    for field in self._fields:
+                        field.set_offset(offset)
+                        frendered = field.render(ctx)
+                        if not isinstance(frendered, Bits):
+                            raise KittyException('the field %s:%s was rendered to type %s, you should probably wrap it with appropriate encoder' % (
+                                field.get_name(), type(field), type(frendered)))
+                        rendered.append(frendered)
+                        offset += len(frendered)
+                    self.set_current_value(rendered)
+            ctx.pop()
         return self._current_rendered
 
     def set_offset(self, offset):

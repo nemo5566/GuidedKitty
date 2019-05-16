@@ -23,3 +23,4 @@ from kitty.model.high_level.base import *
 from kitty.model.high_level.graph import *
 from kitty.model.high_level.random_sequence import *
 from kitty.model.high_level.staged_sequence import *
+from kitty.model.high_level.guided import *
