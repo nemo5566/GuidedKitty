@@ -345,7 +345,7 @@ class QueueEntry(KittyObject):
                 self._queued_favored += 1
                 if not self._top_rated[i].was_fuzzed:
                     self._pending_favored += 1
-                i += 1
+            i += 1
         q = self._queue
         while q:
             self._mark_as_redundant(q, q.favored)
@@ -395,6 +395,7 @@ class QueueEntry(KittyObject):
             else:
                 self._new_hit_cnt = self._queue_paths + self._unique_crashes  # ????
                 if self._do_splicing():
+                    self._havoc_num = 0
                     break
                 else:
                     self._havoc_num = 0
@@ -606,7 +607,7 @@ class QueueEntry(KittyObject):
             while not target:
                 if self._splicing_cycle < SPLICE_CYCLES and self._queue_paths > 1 and self._queue_cur.len > 8:
                     while True:
-                        tid = random.randint(0, self._queue_paths)
+                        tid = random.randint(0, self._queue_paths - 1)
                         if tid != self._current_entry:
                             break
                     target = self._queue
@@ -619,7 +620,7 @@ class QueueEntry(KittyObject):
                     while target.sequence[-1].dst.render().len < 16 or target == self._queue_cur:
                         target = target.next
                         self._splicing_with += 1
-                    if target:
+                    if not target:
                         break
                     # with open(target.fname, "rb") as tf:
                     #     tbuff = tf.read()
@@ -638,8 +639,10 @@ class QueueEntry(KittyObject):
                             if f_loc == -1:
                                 f_loc = i
                     self._splicing_cycle += 1
+
                 else:
                     return 1
+            target = None
         split_at = f_loc + random.randint(0, l_loc - f_loc)
         tlen = target.len
         newbuff = tbuff[0: split_at]  # type: str
@@ -654,7 +657,12 @@ class QueueEntry(KittyObject):
             self._pending_not_fuzzed -= 1
             if self._queue_cur.favored:
                 self.pending_favored -= 1
-        return
+            self._queue_cur = self._queue_cur.next
+            self._current_entry += 1
+            self._queue_cur_change = True
+            return
+        else:
+            assert True, "Fuzzing finished"
 
     def _update_queue_cur(self, target, newbuff):
 
