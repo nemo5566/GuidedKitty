@@ -24,6 +24,10 @@ HAVOC_BLK_XL = 32768
 HAVOC_MAX_MULT = 16
 SPLICE_CYCLES = 15
 MAP_SIZE = 65536
+SKIP_TO_NEW_PROB = 99 #/* ...when there are new, pending favorites */
+SKIP_NFAV_OLD_PROB = 95 #/* ...no new favs, cur entry already fuzzed */
+SKIP_NFAV_NEW_PROB = 75 #/* ...no new favs, cur entry not fuzzed yet */
+
 
 class GuidedModel(BaseModel):
     """
@@ -50,6 +54,7 @@ class GuidedModel(BaseModel):
         self._current_node = None
         self._queue = QueueEntry()
         self._det_num_mutations = 0
+        self.skip_run = False
 
     def _get_ready(self):
         if not self._ready:
@@ -109,8 +114,8 @@ class GuidedModel(BaseModel):
         return self._queue.queue_cur.sequence[-1].dst
 
     def _mutate(self):
-
-        self._queue._mutate()
+        self.skip_run = False
+        self.skip_run = self._queue._mutate()
 
     def num_mutations(self):
         '''
@@ -180,6 +185,9 @@ class GuidedModel(BaseModel):
         self._graph[src_id].append(Connection(src, dst, callback))
         if dst_id not in self._graph:
             self._graph[dst_id] = []
+
+    def save_if_interesting(self):
+        pass
 
 
 class QueueNode(KittyObject):
@@ -260,6 +268,12 @@ class QueueEntry(KittyObject):
         self.queued_with_cov = 0
         self._queued_favored = 0
         self._dumb_mode = False
+        self._queued_discovered = 0
+        self.total_cal_us = 0
+        self.total_cal_cycles = 0
+        self.total_bitmap_size = 0
+        self.total_bitmap_entries = 0
+        self.havoc_div = 1
         # global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC, HAVOC_BLK_LARGE, HAVOC_BLK_SMALL, HAVOC_BLK_MEDIUM, \
         #     HAVOC_BLK_XL, HAVOC_MAX_MULT, SPLICE_CYCLES
 
@@ -336,8 +350,8 @@ class QueueEntry(KittyObject):
         i = 0
         while i < MAP_SIZE:
             if self._top_rated[i] and temp_v[i]:
-                j = MAP_SIZE
-                while j > 0:
+                j = MAP_SIZE - 1
+                while j >= 0:
                     if self._top_rated[i].trace_mini[j]:
                         temp_v[j] = 0
                     j -= 1
@@ -358,20 +372,36 @@ class QueueEntry(KittyObject):
         pass
 
     def _mutate(self):
+
+
         if self._queue_cur_change:
             self._cull_queue()
-            self._calculate_score()
+            self._calculate_score(self._queue_cur)
             self._queue_cur_change = False
-
-        if not self._queue_cur:
-            self._queue_cycle += 1
-            self._current_entry = 0
-            self._queue_cur = self._queue
+        if self._pending_favored:
+            if self._queue_cur.was_fuzzed and not self._queue_cur.favored:
+                if random.randint(1, 100) < SKIP_TO_NEW_PROB:
+                    return True
+        elif not self._dumb_mode and not self._queue_cur.favored and self._queue_paths > 10:
+            if self._queue_cycle > 1 and not self._queue_cur.was_fuzzed:
+                if random.randint(1, 100) < SKIP_NFAV_NEW_PROB:
+                    return True
+            else:
+                if random.randint(1, 100) < SKIP_NFAV_OLD_PROB:
+                    return True
 
         if not self._queue_cur.passed_det:
             self._do_det()
         else:
             self._do_havoc_and_splicing()
+
+        self._abandon_entry()
+
+        if not self._queue_cur:
+            self._queue_cycle += 1
+            self._current_entry = 0
+            self._queue_cur = self._queue
+        return False
 
     def _do_det(self):
         node = self._queue_cur.sequence[-1].dst
@@ -383,6 +413,7 @@ class QueueEntry(KittyObject):
             node.reset()
 
     def _do_havoc_and_splicing(self):
+        self.logger.debug("Start Havoc and Splicing >>>>>>>>>>>>>>>>>>>>")
         while True:
             if self._do_havoc():
                 # TODO: Add the following code to the postrun
@@ -399,14 +430,15 @@ class QueueEntry(KittyObject):
                     break
                 else:
                     self._havoc_num = 0
-        self._abandon_entry()
+
 
     def _do_havoc(self):
+        self.logger.debug("Havoc>>>>>>>>>>>>>>>>>>>>>>>>")
         if not self._splicing_cycle:
-            self._havoc_max = HAVOC_CYCLES_INIT * (
-                    self._perf_score / 100)  # need to add havoc_div according to exec secs
+            self._havoc_max = (HAVOC_CYCLES_INIT if self._queue_cur.passed_det else HAVOC_CYCLES) * (
+                    self._perf_score / self.havoc_div / 100)  # need to add havoc_div according to exec secs
         else:
-            self._havoc_max = SPLICE_HAVOC * self._perf_score / 100
+            self._havoc_max = SPLICE_HAVOC * self._perf_score / self.havoc_div / 100
         self._havoc_queue = self._queue_paths
         node = self._queue_cur.sequence[-1].dst
         node._current_index = 1
@@ -600,16 +632,20 @@ class QueueEntry(KittyObject):
             return 0
 
     def _do_splicing(self):
+        self.logger.debug("Splicing>>>>>>>>>>>>>>>>>>>>>>>")
         target = None
         f_loc = -1
         l_loc = -1
-        while f_loc < 0 or l_loc < 2 or f_loc == l_loc:
+        while f_loc < 0 or l_loc < 1 or f_loc == l_loc:
+            target = None
             while not target:
                 if self._splicing_cycle < SPLICE_CYCLES and self._queue_paths > 1 and self._queue_cur.len > 8:
+                    self._splicing_cycle += 1
                     while True:
                         tid = random.randint(0, self._queue_paths - 1)
                         if tid != self._current_entry:
                             break
+                    self._splicing_with = tid
                     target = self._queue
                     while tid >= 100:
                         target = target.next_100
@@ -617,7 +653,7 @@ class QueueEntry(KittyObject):
                     while tid > 0:
                         target = target.next
                         tid -= 1
-                    while target.sequence[-1].dst.render().len < 16 or target == self._queue_cur:
+                    while target and target.sequence[-1].dst.render().len < 16 or target == self._queue_cur:
                         target = target.next
                         self._splicing_with += 1
                     if not target:
@@ -638,11 +674,9 @@ class QueueEntry(KittyObject):
                             l_loc = i
                             if f_loc == -1:
                                 f_loc = i
-                    self._splicing_cycle += 1
-
                 else:
+                    self._splicing_cycle = 0
                     return 1
-            target = None
         split_at = f_loc + random.randint(0, l_loc - f_loc)
         tlen = target.len
         newbuff = tbuff[0: split_at]  # type: str
@@ -656,21 +690,69 @@ class QueueEntry(KittyObject):
             self._queue_cur.was_fuzzed = 1
             self._pending_not_fuzzed -= 1
             if self._queue_cur.favored:
-                self.pending_favored -= 1
+                self._pending_favored -= 1
             self._queue_cur = self._queue_cur.next
             self._current_entry += 1
             self._queue_cur_change = True
-            return
-        else:
-            assert True, "Fuzzing finished"
+        return
+
 
     def _update_queue_cur(self, target, newbuff):
 
         pass
 
-    def _calculate_score(self):
+    def _calculate_score(self, queue):
+        avg_exec_us = self.total_cal_us/self.total_cal_cycles
+        avg_bitmap_size = self.total_bitmap_size/self.total_bitmap_entries
+        self._perf_score = 100
+        if queue.exec_us * 0.1 > avg_exec_us:
+            self._perf_score = 10
+        elif queue.exec_us * 0.25 > avg_exec_us:
+            self._perf_score = 25
+        elif queue.exec_us * 0.5 > avg_exec_us:
+            self._perf_score = 50
+        elif queue.exec_us * 0.75 > avg_exec_us:
+            self._perf_score = 75
+        elif queue.exec_us * 4 < avg_exec_us:
+            self._perf_score = 300
+        elif queue.exec_us * 3 < avg_exec_us:
+            self._perf_score = 200
+        elif queue.exec_us * 2 < avg_exec_us:
+            self._perf_score = 150
 
-        self._perf_score = 0
+        if queue.bitmap_size * 0.3 > avg_bitmap_size:
+            self._perf_score *= 3
+        elif queue.bitmap_size * 0.5 > avg_bitmap_size:
+            self._perf_score *= 2
+        elif queue.bitmap_size * 0.75 > avg_bitmap_size:
+            self._perf_score *= 1.5
+        elif queue.bitmap_size * 3 < avg_bitmap_size:
+            self._perf_score *= 0.25
+        elif queue.bitmap_size * 2 < avg_bitmap_size:
+            self._perf_score *= 0.5
+        elif queue.bitmap_size * 1.5 < avg_bitmap_size:
+            self._perf_score *= 0.75
+
+        if queue.handicap >= 4:
+            self._perf_score *= 4
+            queue.handicap -= 4
+        else:
+            if queue.handicap:
+                self._perf_score *= 2
+                queue.handicap -= 1
+
+        if 4 <= queue.depth <= 7:
+            self._perf_score *= 2
+        elif 8 <= queue.depth <= 13:
+            self._perf_score *= 3
+        elif 14 <= queue.depth <= 25:
+            self._perf_score *= 4
+        elif queue.depth > 25:
+            self._perf_score *= 5
+
+        if self._perf_score > HAVOC_MAX_MULT * 100:
+            self._perf_score = HAVOC_MAX_MULT * 100
+        return
 
     def save_if_interesting(self):
         pass
