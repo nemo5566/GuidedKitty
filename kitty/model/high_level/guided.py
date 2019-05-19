@@ -14,7 +14,7 @@ import math
 INDIR = None
 OUTDIR = None
 QUEUEPATH = None
-HAVOC_CYCLES_INIT = 1024
+HAVOC_CYCLES_INIT = 26
 HAVOC_CYCLES = 256
 SPLICE_HAVOC = 32
 HAVOC_BLK_SMALL = 32  # type: int
@@ -702,7 +702,7 @@ class QueueEntry(KittyObject):
                 else:
                     self._splicing_cycle = 0
                     return 1
-        split_at = f_loc + random.randint(0, l_loc - f_loc)
+        split_at = f_loc + random.randint(1, l_loc - f_loc)
         tlen = target.len
         newbuff = tbuff[0: split_at]  # type: str
         newbuff += qbuff[split_at: tlen]

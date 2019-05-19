@@ -103,7 +103,8 @@ class ApplicationTarget(GuidedTarget):
             self.logger.info('data (start): %s', data[:end].encode('hex'))
         cmd = [self.path] + self.args
         if self.tempfile:
-            nfile = open(self.tempfile, 'wb')
+            tmpfile = "%s%06u" % (self.tempfile, self.test_number)
+            nfile = open(tmpfile, 'wb')
             nfile.write(data)
             nfile.close()
             self.logger.debug('tempfile written successfully')

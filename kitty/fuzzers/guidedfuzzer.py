@@ -134,7 +134,7 @@ class GuidedFuzzer(BaseFuzzer):
             #         first_trace = trace_bits
             j += 1
         stop_us = int(time.time() * 1000)
-        queue_entry.total_cal_us += start_us - stop_us
+        queue_entry.total_cal_us += stop_us - start_us
         queue_entry.total_cal_cycles += stage_max
         queue.exec_us = (stop_us - start_us)/stage_max
         queue.bitmap_size = queue_entry.get_bitmap_size(trace_bits)
