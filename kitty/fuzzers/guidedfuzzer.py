@@ -65,9 +65,9 @@ class GuidedFuzzer(BaseFuzzer):
             if not self.model.skip_run:
                 sequence = self.model.get_sequence()
                 try:
-                    self._run_sequence(sequence)
-                    self.model.save_if_interesting()
+                    run_res, trace_bits, pos_res = self._run_sequence(sequence)
                 except Exception as e:
+                    self.model.save_if_interesting(run_res, trace_bits, e)
                     self.logger.error('Error occurred while fuzzing: %s', repr(e))
                     self.logger.error(traceback.format_exc())
                     break
@@ -155,7 +155,7 @@ class GuidedFuzzer(BaseFuzzer):
         # self._test_list = StartEndList(0, self.model.num_mutations())
         # self._load_session()
         self._check_pause()
-        # self._pre_test()
+        self._pre_test()
         trace_bits = [0] * MAP_SIZE
         session_data = self.target.get_session_data()
         self._test_info()
