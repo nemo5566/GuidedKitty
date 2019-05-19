@@ -84,7 +84,7 @@ class GuidedFuzzer(BaseFuzzer):
     def _perform_dry_run(self):
         queue_entry = self.model.get_queue()
         cal_failures = 0
-        q = queue_entry._queue
+        q = queue_entry.queue
         while q:
             res = self.calibrate_case(q, queue_entry)
             q = q.next
