@@ -14,7 +14,7 @@ import math
 INDIR = None
 OUTDIR = None
 QUEUEPATH = None
-HAVOC_CYCLES_INIT = 1024
+HAVOC_CYCLES_INIT = 26
 HAVOC_CYCLES = 256
 SPLICE_HAVOC = 32
 HAVOC_BLK_SMALL = 32  # type: int
@@ -24,6 +24,10 @@ HAVOC_BLK_XL = 32768
 HAVOC_MAX_MULT = 16
 SPLICE_CYCLES = 15
 MAP_SIZE = 65536
+SKIP_TO_NEW_PROB = 99 #/* ...when there are new, pending favorites */
+SKIP_NFAV_OLD_PROB = 95 #/* ...no new favs, cur entry already fuzzed */
+SKIP_NFAV_NEW_PROB = 75 #/* ...no new favs, cur entry not fuzzed yet */
+
 
 class GuidedModel(BaseModel):
     """
@@ -50,6 +54,7 @@ class GuidedModel(BaseModel):
         self._current_node = None
         self._queue = QueueEntry()
         self._det_num_mutations = 0
+        self.skip_run = False
 
     def _get_ready(self):
         if not self._ready:
@@ -92,7 +97,7 @@ class GuidedModel(BaseModel):
                 sqbit.tofile(f)
             f.close()
             self._queue.add_to_queue(sqfilename, sq, sqlen)
-            self._queue._queue_cur = self._queue._queue
+            self._queue.queue_cur = self._queue.queue
 
     def _load_extras(self):
         # TODO: need to load the extras in fields
@@ -109,8 +114,8 @@ class GuidedModel(BaseModel):
         return self._queue.queue_cur.sequence[-1].dst
 
     def _mutate(self):
-
-        self._queue._mutate()
+        self.skip_run = False
+        self.skip_run = self._queue._mutate()
 
     def num_mutations(self):
         '''
@@ -181,6 +186,32 @@ class GuidedModel(BaseModel):
         if dst_id not in self._graph:
             self._graph[dst_id] = []
 
+    def save_if_interesting(self, run_res, tracebits, e):
+        hnb = self._queue.has_new_bits(tracebits)
+        if not hnb:
+            self._queue.total_carshes += 1
+            return 0
+        qname = "id:%06u,src:%06u" % (self._queue.queue_paths, self._queue.current_entry)
+        sq = self._queue.queue_cur.sequence
+        sq[-1].dst._det_finish = True
+        sqlen = 0
+        sqbit = BitArray()
+        for i in sq:
+            sqrender = i.dst.render()
+            sqlen += sqrender.len
+            sqbit.append(sqrender)
+        sqfilename = os.path.join(self._queue.queue_out_path, qname)
+        with open(sqfilename, "wb") as f:
+            sqbit.tofile(f)
+        f.close()
+        self._queue.add_to_queue(qname, sq, sqlen)
+        if hnb == 2:
+            self._queue.queue_top.has_new_cov = 1
+            self._queue.queued_with_cov += 1
+        return 1
+
+
+
 
 class QueueNode(KittyObject):
     """
@@ -227,19 +258,19 @@ class QueueEntry(KittyObject):
         self._extras_cnt = 0
         self._a_extras_cnt = 0
         self._queue_list = []
-        self._queue = None
-        self._queue_cur = None
-        self._queue_top = None
+        self.queue = None
+        self.queue_cur = None
+        self.queue_top = None
         self._queue_prev100 = None
         self._reversquences = None
         self._cur_depth = 0
         self._max_depth = 1000
-        self._queue_paths = 0
+        self.queue_paths = 0
         self._pending_not_fuzzed = 0
         self._cycles_no_finds = 0
         self._last_path_time = None
         self._queue_cycle = 0
-        self._current_entry = 0
+        self.current_entry = 0
         self._queue_cur_change = False
         self._havoc_max = 0
         self._splicing_max = 0
@@ -260,6 +291,14 @@ class QueueEntry(KittyObject):
         self.queued_with_cov = 0
         self._queued_favored = 0
         self._dumb_mode = False
+        self._queued_discovered = 0
+        self.total_cal_us = 0
+        self.total_cal_cycles = 0
+        self.total_bitmap_size = 0
+        self.total_bitmap_entries = 0
+        self.havoc_div = 1
+        self.queue_out_path = ""
+        self.total_carshes = 0
         # global HAVOC_CYCLES, HAVOC_CYCLES_INIT, SPLICE_HAVOC, HAVOC_BLK_LARGE, HAVOC_BLK_SMALL, HAVOC_BLK_MEDIUM, \
         #     HAVOC_BLK_XL, HAVOC_MAX_MULT, SPLICE_CYCLES
 
@@ -286,17 +325,17 @@ class QueueEntry(KittyObject):
         if q.depth > self._max_depth:
             self._max_depth = q.depth
 
-        if self._queue_top:
-            self._queue_top.next = q
-            self._queue_top = q
+        if self.queue_top:
+            self.queue_top.next = q
+            self.queue_top = q
         else:
-            self._queue_prev100 = self._queue = self._queue_top = q
+            self._queue_prev100 = self.queue = self.queue_top = q
 
-        self._queue_paths += 1
+        self.queue_paths += 1
         self._pending_not_fuzzed += 1
         self._cycles_no_finds = 0
 
-        if self._queue_paths // 100:
+        if self.queue_paths // 100:
             self._queue_prev100.next = q
             self._queue_prev100 = q
 
@@ -304,15 +343,15 @@ class QueueEntry(KittyObject):
 
     def pivot_inputs(self):
         pivot_id = 0
-        q = self._queue
-        queue_path = os.path.join(OUTDIR, "queue%s" % time.strftime("%Y%m%d-%H%M%S"))
+        q = self.queue
+        self.queue_out_path = os.path.join(OUTDIR, "queue%s" % time.strftime("%Y%m%d-%H%M%S"))
         global QUEUEPATH
-        QUEUEPATH = queue_path
-        os.mkdir(queue_path)
+        QUEUEPATH = self.queue_out_path
+        os.mkdir(self.queue_out_path)
         while q:
             fname = os.path.split(q.fname)[-1]
             qname = "id:%06u,orig:%s" % (pivot_id, fname)
-            nfn = os.path.join(queue_path, qname)
+            nfn = os.path.join(self.queue_out_path, qname)
             os.link(q.fname, nfn)
             q.fname = nfn
 
@@ -329,15 +368,15 @@ class QueueEntry(KittyObject):
         self._score_changed = 0
         self._queued_favored = 0
         self._pending_favored = 0
-        q = self._queue
+        q = self.queue
         while q:
             q.favored = 0
             q = q.next
         i = 0
         while i < MAP_SIZE:
             if self._top_rated[i] and temp_v[i]:
-                j = MAP_SIZE
-                while j > 0:
+                j = MAP_SIZE - 1
+                while j >= 0:
                     if self._top_rated[i].trace_mini[j]:
                         temp_v[j] = 0
                     j -= 1
@@ -345,8 +384,8 @@ class QueueEntry(KittyObject):
                 self._queued_favored += 1
                 if not self._top_rated[i].was_fuzzed:
                     self._pending_favored += 1
-                i += 1
-        q = self._queue
+            i += 1
+        q = self.queue
         while q:
             self._mark_as_redundant(q, q.favored)
             q = q.next
@@ -358,31 +397,48 @@ class QueueEntry(KittyObject):
         pass
 
     def _mutate(self):
+
+
         if self._queue_cur_change:
             self._cull_queue()
-            self._calculate_score()
+            self._calculate_score(self.queue_cur)
             self._queue_cur_change = False
+        if self._pending_favored:
+            if self.queue_cur.was_fuzzed and not self.queue_cur.favored:
+                if random.randint(1, 100) < SKIP_TO_NEW_PROB:
+                    return True
+        elif not self._dumb_mode and not self.queue_cur.favored and self.queue_paths > 10:
+            if self._queue_cycle > 1 and not self.queue_cur.was_fuzzed:
+                if random.randint(1, 100) < SKIP_NFAV_NEW_PROB:
+                    return True
+            else:
+                if random.randint(1, 100) < SKIP_NFAV_OLD_PROB:
+                    return True
 
-        if not self._queue_cur:
-            self._queue_cycle += 1
-            self._current_entry = 0
-            self._queue_cur = self._queue
-
-        if not self._queue_cur.passed_det:
+        if not self.queue_cur.passed_det:
             self._do_det()
         else:
             self._do_havoc_and_splicing()
 
+        self._abandon_entry()
+
+        if not self.queue_cur:
+            self._queue_cycle += 1
+            self.current_entry = 0
+            self.queue_cur = self.queue
+        return False
+
     def _do_det(self):
-        node = self._queue_cur.sequence[-1].dst
+        node = self.queue_cur.sequence[-1].dst
         if node.mutate():
             return
         else:
             node._det_finish = True
-            self._queue_cur.passed_det = True
+            self.queue_cur.passed_det = True
             node.reset()
 
     def _do_havoc_and_splicing(self):
+        self.logger.debug("Start Havoc and Splicing >>>>>>>>>>>>>>>>>>>>")
         while True:
             if self._do_havoc():
                 # TODO: Add the following code to the postrun
@@ -393,21 +449,23 @@ class QueueEntry(KittyObject):
                 #     self._havoc_queue = self._queue_paths
                 return
             else:
-                self._new_hit_cnt = self._queue_paths + self._unique_crashes  # ????
+                self._new_hit_cnt = self.queue_paths + self._unique_crashes  # ????
                 if self._do_splicing():
+                    self._havoc_num = 0
                     break
                 else:
                     self._havoc_num = 0
-        self._abandon_entry()
+
 
     def _do_havoc(self):
+        self.logger.debug("Havoc>>>>>>>>>>>>>>>>>>>>>>>>")
         if not self._splicing_cycle:
-            self._havoc_max = HAVOC_CYCLES_INIT * (
-                    self._perf_score / 100)  # need to add havoc_div according to exec secs
+            self._havoc_max = (HAVOC_CYCLES_INIT if self.queue_cur.passed_det else HAVOC_CYCLES) * (
+                    self._perf_score / self.havoc_div / 100)  # need to add havoc_div according to exec secs
         else:
-            self._havoc_max = SPLICE_HAVOC * self._perf_score / 100
-        self._havoc_queue = self._queue_paths
-        node = self._queue_cur.sequence[-1].dst
+            self._havoc_max = SPLICE_HAVOC * self._perf_score / self.havoc_div / 100
+        self._havoc_queue = self.queue_paths
+        node = self.queue_cur.sequence[-1].dst
         node._current_index = 1
         node_val = BitArray(node.render()).copy()
         if self._havoc_max < 16:
@@ -599,27 +657,31 @@ class QueueEntry(KittyObject):
             return 0
 
     def _do_splicing(self):
+        self.logger.debug("Splicing>>>>>>>>>>>>>>>>>>>>>>>")
         target = None
         f_loc = -1
         l_loc = -1
-        while f_loc < 0 or l_loc < 2 or f_loc == l_loc:
+        while f_loc < 0 or l_loc < 1 or f_loc == l_loc:
+            target = None
             while not target:
-                if self._splicing_cycle < SPLICE_CYCLES and self._queue_paths > 1 and self._queue_cur.len > 8:
+                if self._splicing_cycle < SPLICE_CYCLES and self.queue_paths > 1 and self.queue_cur.len > 8:
+                    self._splicing_cycle += 1
                     while True:
-                        tid = random.randint(0, self._queue_paths)
-                        if tid != self._current_entry:
+                        tid = random.randint(0, self.queue_paths - 1)
+                        if tid != self.current_entry:
                             break
-                    target = self._queue
+                    self._splicing_with = tid
+                    target = self.queue
                     while tid >= 100:
                         target = target.next_100
                         tid -= 100
                     while tid > 0:
                         target = target.next
                         tid -= 1
-                    while target.sequence[-1].dst.render().len < 16 or target == self._queue_cur:
+                    while target and target.sequence[-1].dst.render().len < 16 or target == self.queue_cur:
                         target = target.next
                         self._splicing_with += 1
-                    if target:
+                    if not target:
                         break
                     # with open(target.fname, "rb") as tf:
                     #     tbuff = tf.read()
@@ -629,7 +691,7 @@ class QueueEntry(KittyObject):
                     # qf.close()
                     tnode = target.sequence[-1].dst
                     tbuff = BitArray(tnode.render()).copy()
-                    qnode = self._queue_cur.sequence[-1].dst
+                    qnode = self.queue_cur.sequence[-1].dst
                     qbuff = BitArray(qnode.render()).copy()
                     minlen = min(len(tbuff), len(qbuff))
                     for i in range(0, minlen):
@@ -637,10 +699,10 @@ class QueueEntry(KittyObject):
                             l_loc = i
                             if f_loc == -1:
                                 f_loc = i
-                    self._splicing_cycle += 1
                 else:
+                    self._splicing_cycle = 0
                     return 1
-        split_at = f_loc + random.randint(0, l_loc - f_loc)
+        split_at = f_loc + random.randint(1, l_loc - f_loc)
         tlen = target.len
         newbuff = tbuff[0: split_at]  # type: str
         newbuff += qbuff[split_at: tlen]
@@ -649,20 +711,73 @@ class QueueEntry(KittyObject):
 
     def _abandon_entry(self):
         self._splicing_with = -1
-        if not self._stop_soon and not self._queue_cur.cal_failed and not self._queue_cur.was_fuzzed:
-            self._queue_cur.was_fuzzed = 1
+        if not self._stop_soon and not self.queue_cur.cal_failed and not self.queue_cur.was_fuzzed:
+            self.queue_cur.was_fuzzed = 1
             self._pending_not_fuzzed -= 1
-            if self._queue_cur.favored:
-                self.pending_favored -= 1
+            if self.queue_cur.favored:
+                self._pending_favored -= 1
+            self.queue_cur = self.queue_cur.next
+            self.current_entry += 1
+            self._queue_cur_change = True
         return
+
 
     def _update_queue_cur(self, target, newbuff):
 
         pass
 
-    def _calculate_score(self):
+    def _calculate_score(self, queue):
+        avg_exec_us = self.total_cal_us/self.total_cal_cycles
+        avg_bitmap_size = self.total_bitmap_size/self.total_bitmap_entries
+        self._perf_score = 100
+        if queue.exec_us * 0.1 > avg_exec_us:
+            self._perf_score = 10
+        elif queue.exec_us * 0.25 > avg_exec_us:
+            self._perf_score = 25
+        elif queue.exec_us * 0.5 > avg_exec_us:
+            self._perf_score = 50
+        elif queue.exec_us * 0.75 > avg_exec_us:
+            self._perf_score = 75
+        elif queue.exec_us * 4 < avg_exec_us:
+            self._perf_score = 300
+        elif queue.exec_us * 3 < avg_exec_us:
+            self._perf_score = 200
+        elif queue.exec_us * 2 < avg_exec_us:
+            self._perf_score = 150
 
-        self._perf_score = 0
+        if queue.bitmap_size * 0.3 > avg_bitmap_size:
+            self._perf_score *= 3
+        elif queue.bitmap_size * 0.5 > avg_bitmap_size:
+            self._perf_score *= 2
+        elif queue.bitmap_size * 0.75 > avg_bitmap_size:
+            self._perf_score *= 1.5
+        elif queue.bitmap_size * 3 < avg_bitmap_size:
+            self._perf_score *= 0.25
+        elif queue.bitmap_size * 2 < avg_bitmap_size:
+            self._perf_score *= 0.5
+        elif queue.bitmap_size * 1.5 < avg_bitmap_size:
+            self._perf_score *= 0.75
+
+        if queue.handicap >= 4:
+            self._perf_score *= 4
+            queue.handicap -= 4
+        else:
+            if queue.handicap:
+                self._perf_score *= 2
+                queue.handicap -= 1
+
+        if 4 <= queue.depth <= 7:
+            self._perf_score *= 2
+        elif 8 <= queue.depth <= 13:
+            self._perf_score *= 3
+        elif 14 <= queue.depth <= 25:
+            self._perf_score *= 4
+        elif queue.depth > 25:
+            self._perf_score *= 5
+
+        if self._perf_score > HAVOC_MAX_MULT * 100:
+            self._perf_score = HAVOC_MAX_MULT * 100
+        return
 
     def save_if_interesting(self):
         pass
@@ -670,9 +785,6 @@ class QueueEntry(KittyObject):
     def write_to_testcase(self):
         pass
 
-    @property
-    def queue_cur(self):
-        return self._queue_cur
 
     def _choose_block_len(self, limit):
         """

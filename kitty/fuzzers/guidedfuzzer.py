@@ -10,8 +10,6 @@ from kitty.fuzzers.test_list import RangesList, StartEndList
 
 CAL_CYCLES = 4
 CAL_CYCLES_LONG = 40
-TOTAL_CAL_US = 0
-TOTAL_CAL_CYCLES = 0
 MAP_SIZE = 65536
 
 
@@ -64,13 +62,15 @@ class GuidedFuzzer(BaseFuzzer):
     def _start(self):
         self.logger.info('should keep running? %s' % self._keep_running())
         while self._next_mutation():
-            sequence = self.model.get_sequence()
-            try:
-                self._run_sequence(sequence)
-            except Exception as e:
-                self.logger.error('Error occurred while fuzzing: %s', repr(e))
-                self.logger.error(traceback.format_exc())
-                break
+            if not self.model.skip_run:
+                sequence = self.model.get_sequence()
+                try:
+                    run_res, trace_bits, pos_res = self._run_sequence(sequence)
+                except Exception as e:
+                    self.model.save_if_interesting(run_res, trace_bits, e)
+                    self.logger.error('Error occurred while fuzzing: %s', repr(e))
+                    self.logger.error(traceback.format_exc())
+                    break
         self._end_message()
 
     def _test_environment(self):
@@ -84,11 +84,17 @@ class GuidedFuzzer(BaseFuzzer):
     def _perform_dry_run(self):
         queue_entry = self.model.get_queue()
         cal_failures = 0
-        q = queue_entry._queue
+        q = queue_entry.queue
         while q:
             res = self.calibrate_case(q, queue_entry)
             q = q.next
-
+        avg_us = queue_entry.total_cal_us / queue_entry.total_cal_cycles
+        if avg_us > 50000:
+            queue_entry.havoc_div = 10
+        elif avg_us > 20000:
+            queue_entry.havoc_div = 5
+        elif avg_us > 10000:
+            queue_entry.havoc_div = 2
 
 
     def calibrate_case(self, queue, queue_entry):
@@ -98,7 +104,6 @@ class GuidedFuzzer(BaseFuzzer):
         new paths are discovered to detect variable behavior and so on.
         :return:
         """
-        global TOTAL_CAL_US, TOTAL_CAL_CYCLES
         first_trace = [0]*MAP_SIZE
         var_bytes = [0]*MAP_SIZE
         new_bits = 0
@@ -129,10 +134,12 @@ class GuidedFuzzer(BaseFuzzer):
             #         first_trace = trace_bits
             j += 1
         stop_us = int(time.time() * 1000)
-        TOTAL_CAL_US += start_us - stop_us
-        TOTAL_CAL_CYCLES += stage_max
+        queue_entry.total_cal_us += stop_us - start_us
+        queue_entry.total_cal_cycles += stage_max
         queue.exec_us = (stop_us - start_us)/stage_max
         queue.bitmap_size = queue_entry.get_bitmap_size(trace_bits)
+        queue_entry.total_bitmap_size += queue.bitmap_size
+        queue_entry.total_bitmap_entries += 1
         # queue.handicap =
         queue.cal_failed = 0
         queue_entry.update_bitmap_score(queue, trace_bits)
@@ -148,7 +155,7 @@ class GuidedFuzzer(BaseFuzzer):
         # self._test_list = StartEndList(0, self.model.num_mutations())
         # self._load_session()
         self._check_pause()
-        # self._pre_test()
+        self._pre_test()
         trace_bits = [0] * MAP_SIZE
         session_data = self.target.get_session_data()
         self._test_info()

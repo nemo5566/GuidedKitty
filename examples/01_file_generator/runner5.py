@@ -8,8 +8,7 @@ t1 = Template(name='T1', fields=[
     Static(value=b'\x00\x00\x00\x00'),
 ])
 t2 = Template(name='T2', fields=[
-    String('Thfdsafdsa string', name='S1_1'),
-    String('Anothedfsafdsafdstring', name='S1_2'),
+    Static(value=b'\x00\x00\x00\x01'),
 ])
 t3 = Template(name='T3', fields=[
     String('Thfdsgfdgring', name='S1_1'),
@@ -21,7 +20,7 @@ t4 = Template(name='T4', fields=[
 ])
 model = GuidedModel(indir = "indir", outdir = "outdir")
 model.connect(t1)
-# model.connect(t1, t2)
+model.connect(t1, t2)
 # model.connect(t2, t4)
 # model.connect(t1, t3)
 # model.connect(t3, t4)
