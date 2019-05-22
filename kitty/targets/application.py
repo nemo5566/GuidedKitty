@@ -126,13 +126,19 @@ class ApplicationTarget(GuidedTarget):
         end = start + self.timeout
         wait_time = end - start
         while wait_time > 0:
-            rl, wl, xl = select.select([fd], [], [], wait_time)
-            if rl:
-                resp += rl[0].read()
+            epoll_fd = select.epoll()
+            epoll_fd.register(fd, select.EPOLLIN)
+            events = epoll_fd.poll(wait_time)
+
+            if events:
+                for fileno, event in events:
+                    if event & select.EPOLLIN:
+                        resp += fileno.read()
             wait_time = end - time.time()
         return resp
 
     def post_test(self, test_num):
+        print test_num
         self.report.add('stdout', self._read(self._process.stdout))
         self.report.add('stderr', self._read(self._process.stderr))
         if self._process.poll() is None:
