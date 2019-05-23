@@ -122,7 +122,7 @@ class GuidedModel(BaseModel):
         :return: number of mutations in the model
         '''
         self._get_ready()
-        return self._det_num_mutations + 100
+        return self._det_num_mutations + 999999999
 
     def _get_sequences(self, sequence=[]):
         sequences = []
