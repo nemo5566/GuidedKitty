@@ -34,3 +34,4 @@ or when writing payloads to files.
 from kitty.fuzzers.base import BaseFuzzer
 from kitty.fuzzers.client import ClientFuzzer
 from kitty.fuzzers.server import ServerFuzzer
+from kitty.fuzzers.guidedfuzzer import GuidedFuzzer

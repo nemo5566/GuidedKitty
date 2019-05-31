@@ -40,3 +40,4 @@ from kitty.targets.base import BaseTarget
 from kitty.targets.client import ClientTarget
 from kitty.targets.empty import EmptyTarget
 from kitty.targets.server import ServerTarget
+from kitty.targets.guidedtarget import GuidedTarget
